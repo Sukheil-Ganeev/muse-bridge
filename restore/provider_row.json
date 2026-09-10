@@ -1,0 +1,16 @@
+{
+  "id": "meta-muse-bridge-1",
+  "name": "Meta Muse",
+  "vendor_key": "custom",
+  "type": "openai_compatible",
+  "protocol": "openai_compatible",
+  "api_style": "chat_completions",
+  "auth_kind": "none",
+  "base_url": "http://127.0.0.1:11471/v1",
+  "enabled": 1,
+  "secret_ref": null,
+  "default_model_id": "muse-spark-1.2",
+  "config_json": "{\"models\": [{\"id\": \"muse-spark-1.3\", \"contextWindow\": 1048576, \"maxTokens\": 131072, \"thinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"], \"defaultThinkingLevel\": \"high\"}, {\"id\": \"muse-spark-1.2\", \"contextWindow\": 1048576, \"maxTokens\": 131072, \"thinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"], \"defaultThinkingLevel\": \"high\"}, {\"id\": \"muse-spark-1.1\", \"contextWindow\": 1048576, \"maxTokens\": 131072, \"thinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"], \"defaultThinkingLevel\": \"high\"}, {\"id\": \"muse-spark-1.3-contributor\", \"contextWindow\": 1048576, \"maxTokens\": 131072, \"thinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"], \"defaultThinkingLevel\": \"high\"}, {\"id\": \"muse-spark-1.2-contributor\", \"contextWindow\": 1048576, \"maxTokens\": 131072, \"thinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"], \"defaultThinkingLevel\": \"high\"}], \"compatibility\": {\"supportedThinkingLevels\": [\"off\", \"minimal\", \"low\", \"medium\", \"high\", \"xhigh\"]}}",
+  "created_at": 1788987155880,
+  "updated_at": 1788999292644
+}

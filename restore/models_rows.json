@@ -1,0 +1,57 @@
+[
+  {
+    "provider_id": "meta-muse-bridge-1",
+    "model_id": "muse-spark-1.1",
+    "display_name": "Muse Spark 1.1",
+    "source": "bridge",
+    "capabilities_json": "[\"text\",\"attachments\",\"temperature\",\"tools\",\"reasoning\",\"json\",\"vision\",\"pdf\",\"video\"]",
+    "context_window": 1048576,
+    "max_output_tokens": 131072,
+    "deprecated": 0,
+    "updated_at": 1789030272312
+  },
+  {
+    "provider_id": "meta-muse-bridge-1",
+    "model_id": "muse-spark-1.2",
+    "display_name": "Muse Spark 1.2",
+    "source": "bridge",
+    "capabilities_json": "[\"text\",\"attachments\",\"temperature\",\"tools\",\"reasoning\",\"json\",\"vision\",\"video\",\"pdf\",\"audio\"]",
+    "context_window": 1048576,
+    "max_output_tokens": 131072,
+    "deprecated": 0,
+    "updated_at": 1789030272312
+  },
+  {
+    "provider_id": "meta-muse-bridge-1",
+    "model_id": "muse-spark-1.2-contributor",
+    "display_name": "Muse Spark 1.2 Contributor",
+    "source": "bridge",
+    "capabilities_json": "[\"text\",\"attachments\",\"temperature\",\"tools\",\"reasoning\",\"json\",\"vision\",\"video\",\"pdf\",\"audio\"]",
+    "context_window": 1048576,
+    "max_output_tokens": 131072,
+    "deprecated": 0,
+    "updated_at": 1789030272312
+  },
+  {
+    "provider_id": "meta-muse-bridge-1",
+    "model_id": "muse-spark-1.3",
+    "display_name": "Muse Spark 1.3",
+    "source": "bridge",
+    "capabilities_json": "[\"text\",\"attachments\",\"temperature\",\"tools\",\"reasoning\",\"json\",\"vision\",\"video\",\"pdf\",\"audio\"]",
+    "context_window": 1048576,
+    "max_output_tokens": 131072,
+    "deprecated": 0,
+    "updated_at": 1789030272312
+  },
+  {
+    "provider_id": "meta-muse-bridge-1",
+    "model_id": "muse-spark-1.3-contributor",
+    "display_name": "Muse Spark 1.3 Contributor",
+    "source": "bridge",
+    "capabilities_json": "[\"text\",\"attachments\",\"temperature\",\"tools\",\"reasoning\",\"json\",\"vision\",\"video\",\"pdf\",\"audio\"]",
+    "context_window": 1048576,
+    "max_output_tokens": 131072,
+    "deprecated": 0,
+    "updated_at": 1789030272312
+  }
+]

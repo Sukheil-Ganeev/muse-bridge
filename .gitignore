@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets and credentials — NEVER commit these
+key.txt
+auth.json
+*.token
+.env
+.env.*
+secrets/
+*.secret
+
+# Logs and temp
+*.log
+*.tmp
+tmp*.txt
+bridge-out.log
+bridge-stderr.log
+bridge-tb.log
+bridge-err-*.log
+codex-bridge-out.txt
+
+# OS
+.DS_Store
+Thumbs.db
