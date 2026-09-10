@@ -91,6 +91,13 @@ python restore/restore_muse_provider.py
 (сначала закрой PI-Desktop, после восстановления открой снова и выбери
 «Meta Muse»).
 
+## PI-Desktop: переключение проекта
+
+Есть отдельный баг самого PI-Desktop (не моста): при переключении проекта
+файлы могут остаться от старого проекта, а инструкции — от нового. Фикс и
+восстановление после обновления описаны в репозитории
+[`codex-workspace-launcher`](https://github.com/Sukheil-Ganeev/codex-workspace-launcher/blob/master/docs/pi-desktop-project-rebind.md).
+
 ## Настройка с нуля через Codex
 
 Хочешь, чтобы всё поставил Codex автоматически? Открой
