@@ -146,6 +146,96 @@ class PostHandlerTests(unittest.TestCase):
             self.assertEqual(e.code, 400)
 
 
+class _FakeStdout:
+    def __init__(self, lines):
+        self._lines = iter(lines)
+        self.closed = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return next(self._lines)
+        except StopIteration:
+            self.closed = True
+            raise
+
+
+class _FakeProc:
+    """Stand-in for subprocess.Popen: stdout closes when drained."""
+
+    def __init__(self, events):
+        self.stdout = _FakeStdout(events)
+        self.killed = False
+        self.wait_calls = []
+
+    def poll(self):
+        return 0 if (self.killed or self.stdout.closed) else None
+
+    def kill(self):
+        self.killed = True
+
+    def wait(self, timeout=None):
+        self.wait_calls.append(timeout)
+        return 0
+
+
+def _delta(text):
+    return json.dumps({"payload_type": "run.output.delta",
+                       "payload": {"text": text}})
+
+
+class StreamAbortTests(unittest.TestCase):
+    """stream_muse: cancel exec + remove temp prompt file on every exit."""
+
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def _patched(self, proc):
+        recorded = {}
+        real_ntf = self.mb.tempfile.NamedTemporaryFile
+
+        def spy(*a, **kw):
+            f = real_ntf(*a, **kw)
+            recorded["path"] = f.name
+            return f
+
+        patches = [
+            mock.patch.object(self.mb.subprocess, "Popen",
+                              return_value=proc),
+            mock.patch.object(self.mb.tempfile, "NamedTemporaryFile",
+                              side_effect=spy),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        return recorded
+
+    def test_client_abort_kills_exec_and_removes_prompt_file(self):
+        proc = _FakeProc([_delta("he"), _delta("llo")])
+        recorded = self._patched(proc)
+
+        def boom(_piece):
+            raise BrokenPipeError("client gone")
+
+        with self.assertRaises(BrokenPipeError):
+            self.mb.stream_muse("m", "p", "high", boom)
+        self.assertTrue(proc.killed)
+        self.assertTrue(proc.wait_calls)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
+    def test_clean_stream_returns_text_without_kill(self):
+        proc = _FakeProc([_delta("he"), _delta("llo")])
+        recorded = self._patched(proc)
+        got = []
+        out = self.mb.stream_muse("m", "p", "high", got.append)
+        self.assertEqual(out, "hello")
+        self.assertEqual(got, ["he", "llo"])
+        self.assertFalse(proc.killed)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
+
 class HealthTests(unittest.TestCase):
     def test_health_and_models(self):
         mb = fresh_bridge("a,b")
