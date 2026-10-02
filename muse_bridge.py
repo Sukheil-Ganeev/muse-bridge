@@ -169,7 +169,6 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     on_delta is also called with None every KEEPALIVE_SEC of silence so the
     HTTP client sees a live stream on long agent runs. Returns the full text.
     """
-    t_start = time.time()
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
                                      encoding="utf-8") as pf:
         pf.write(prompt)
@@ -230,26 +229,30 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 reason = str((ev.get("payload") or {}).get("reason"))[:200]
                 print(f"exec terminal-failed: {reason}", flush=True)
     finally:
+        # Every exit path — client abort, parse errors, terminal failure,
+        # deadline kill — lands here: stop the watchdog, cancel a still-
+        # running exec instead of waiting EXEC_TIMEOUT for it, reap it,
+        # and drop the prompt file.
         stop.set()
-    try:
-        proc.wait(timeout=EXEC_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        raise RuntimeError("muse exec exceeded %ss" % EXEC_TIMEOUT)
-    finally:
-        deadline.cancel()
-    Path(prompt_path).unlink(missing_ok=True)
-    if not "".join(full):
+        if proc.poll() is None:
+            proc.kill()
+        Path(prompt_path).unlink(missing_ok=True)
         try:
-            err_fp.seek(0)
-            err = err_fp.read()[-500:]
+            proc.wait(timeout=10)
         except Exception:
-            err = ""
-        finally:
-            err_fp.close()
-        raise RuntimeError("muse exec produced no text. " + err)
-    err_fp.close()
-    return "".join(full)
+            pass
+        deadline.cancel()
+    try:
+        if not "".join(full):
+            try:
+                err_fp.seek(0)
+                err = err_fp.read()[-500:]
+            except Exception:
+                err = ""
+            raise RuntimeError("muse exec produced no text. " + err)
+        return "".join(full)
+    finally:
+        err_fp.close()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
