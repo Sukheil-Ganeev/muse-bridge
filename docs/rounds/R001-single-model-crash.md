@@ -26,4 +26,7 @@ monkeypatch на атрибуты модуля — без сети, без muse 
 ## Гейт
 CHECK: python3 -m unittest discover -s tests -v
 EXPECT: все тесты PASS
-EVIDENCE: <заполняется выводом>
+EVIDENCE: «Ran 15 tests in 2.540s / OK» (2026-10-02, ветка
+devin/…-r001-single-model-crash). До чина 2 падения:
+ERROR test_unknown_model_falls_back_not_crash (IndexError → обрыв сокета),
+FAIL test_empty_env_falls_back_to_defaults (MODELS=[] без отката).
