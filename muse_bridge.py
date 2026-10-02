@@ -53,7 +53,11 @@ DEFAULT_MODELS = [
 ]
 MODELS = [m.strip() for m in
           os.environ.get("MUSE_BRIDGE_MODELS", ",".join(DEFAULT_MODELS)).split(",")
-          if m.strip()]
+          if m.strip()] or list(DEFAULT_MODELS)
+
+# Fallback model when the request names none or an unknown one. Defaults
+# to the second entry (spark-1.2) but must exist even for a 1-item list.
+DEFAULT_MODEL = MODELS[1] if len(MODELS) > 1 else MODELS[0]
 
 # Flags that keep the nested agent tame in headless mode: no approvals that
 # hang, no shell, no file writes, no web tools, bounded steps.
@@ -344,9 +348,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
-        model = str(payload.get("model") or MODELS[1])
+        model = str(payload.get("model") or DEFAULT_MODEL)
         if model not in MODELS:
-            model = MODELS[1]
+            model = DEFAULT_MODEL
         prompt = build_prompt(payload.get("messages"))
         effort = extract_effort(payload)
         if payload.get("stream"):
