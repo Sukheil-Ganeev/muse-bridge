@@ -29,4 +29,15 @@ compute до срабатывания deadline-таймера (до 280 с), а 
 
 ## EVIDENCE
 
-(заполнить после прогона)
+```
+$ python3 -m unittest discover -s tests
+test_client_abort_kills_exec_and_removes_prompt_file ... ok
+test_clean_stream_returns_text_without_kill ... ok
+Ran 17 tests in 2.547s
+OK
+$ git diff --check   # clean
+```
+
+До правки `test_client_abort_kills_exec_and_removes_prompt_file` был RED:
+`AssertionError: False is not true` на `proc.killed` — процесс продолжал
+работать после обрыва клиента. После правки — GREEN.
