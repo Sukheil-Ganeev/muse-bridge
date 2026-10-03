@@ -28,11 +28,25 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PORT = int(os.environ.get("CODEX_BRIDGE_PORT", "11472"))
+
+
+def _env_int(name: str, fallback: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return fallback
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"{name}={raw!r} is not an integer, using {fallback}", file=sys.stderr, flush=True)
+        return fallback
+
+
+PORT = _env_int("CODEX_BRIDGE_PORT", 11472)
 EXEC_TIMEOUT = 280
 
 MODELS = [
