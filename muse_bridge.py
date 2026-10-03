@@ -157,8 +157,8 @@ def build_prompt(messages) -> str:
         content = m.get("content", "")
         if isinstance(content, list):
             content = " ".join(
-                str(p.get("text") or "") for p in content if isinstance(p, dict)
-                and p.get("text"))
+                str(p.get("text")) for p in content if isinstance(p, dict)
+                and p.get("text") is not None and p.get("text") != "")
         if content is None:
             content = ""
         parts.append(f"[{role}]\n{content}")
