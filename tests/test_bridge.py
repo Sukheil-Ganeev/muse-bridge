@@ -103,6 +103,18 @@ class ModelListTests(unittest.TestCase):
         self.assertEqual(mb.MODELS, mb.DEFAULT_MODELS)
 
 
+class CodexBuildPromptTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def test_numeric_text_part_is_coerced_to_string(self):
+        prompt = self.cb.build_prompt([{
+            "role": "user",
+            "content": [{"type": "text", "text": 123}],
+        }])
+        self.assertEqual(prompt, "[user]\n123")
+
+
 class CodexPostValidationTests(unittest.TestCase):
     def setUp(self):
         self.cb = fresh_codex_bridge()
@@ -128,6 +140,52 @@ class CodexPostValidationTests(unittest.TestCase):
 
     def test_non_object_message_item_returns_400(self):
         self.assertEqual(self._post({"messages": [42]})["status"], 400)
+
+
+class CodexOutputIsolationTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def test_concurrent_calls_use_and_remove_distinct_output_files(self):
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with self.cb.tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+            started = threading.Barrier(2)
+            written = threading.Barrier(2)
+            results = {}
+            failures = []
+
+            def fake_run(args, **_kwargs):
+                output_path = args[args.index("-o") + 1]
+                answer = threading.current_thread().name
+                started.wait(timeout=5)
+                with open(output_path, "w", encoding="utf-8") as output:
+                    output.write(answer)
+                written.wait(timeout=5)
+                return mock.Mock(stderr="")
+
+            def invoke(answer):
+                try:
+                    results[answer] = self.cb.run_codex("m", "p")
+                except BaseException as exc:
+                    failures.append(exc)
+
+            with mock.patch.object(self.cb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.cb.subprocess, "run",
+                                   side_effect=fake_run):
+                threads = [threading.Thread(target=invoke, args=(answer,),
+                                            name=answer)
+                           for answer in ("answer-A", "answer-B")]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=10)
+
+            self.assertFalse(any(thread.is_alive() for thread in threads))
+            self.assertEqual(failures, [])
+            self.assertEqual(results, {"answer-A": "answer-A",
+                                       "answer-B": "answer-B"})
+            self.assertEqual(os.listdir(temp_dir), [])
 
 
 class TerminalFailureTests(unittest.TestCase):
