@@ -2,8 +2,8 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
-| R015 | codex: числовой text-парт в content сводится к строке | 🟡 codex w34 |
-| R014 | codex: уникальный temp-файл ответа на запрос (не общий) | 🟡 codex w34 |
+| R015 | codex: числовой text-парт в content сводится к строке | ✅ [#17](https://github.com/Sukheil-Ganeev/muse-bridge/pull/17) |
+| R014 | codex: уникальный temp-файл ответа на запрос (не общий) | ✅ [#17](https://github.com/Sukheil-Ganeev/muse-bridge/pull/17) |
 | R013 | Проверка формы JSON-тела в POST /v1/chat/completions | ✅ [#16](https://github.com/Sukheil-Ganeev/muse-bridge/pull/16) |
 | R012 | PORT env: мусорное значение = warn + дефолт | ✅ [#15](https://github.com/Sukheil-Ganeev/muse-bridge/pull/15) |
 | R011 | terminal-failed с reason в исключении | ✅ [#14](https://github.com/Sukheil-Ganeev/muse-bridge/pull/14) |
