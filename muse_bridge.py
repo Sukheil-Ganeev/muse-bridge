@@ -378,7 +378,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             model = DEFAULT_MODEL
         prompt = build_prompt(payload.get("messages"))
         effort = extract_effort(payload)
-        if payload.get("stream"):
+        if payload.get("stream") is True:
             self._stream_chat(model, prompt, effort)
             return
         try:

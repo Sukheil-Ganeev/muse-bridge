@@ -182,6 +182,21 @@ class PostHandlerTests(unittest.TestCase):
         self.assertEqual(status, 502)
         self.assertIn("boom", body["error"]["message"])
 
+    def test_stream_string_false_is_not_streaming(self):
+        # stream="false" (строка) — не булево true, ответ должен быть JSON, не SSE.
+        mb, port = self._serve()
+        seen = {"streamed": False}
+        def fake_stream(self, model, prompt, effort):
+            seen["streamed"] = True
+        with mock.patch.object(mb.Handler, "_stream_chat", fake_stream), \
+             mock.patch.object(mb, "run_muse", return_value="ok"):
+            status, body = self._post(port, {
+                "model": "muse-spark-1.3", "stream": "false",
+                "messages": [{"role": "user", "content": "hi"}]})
+        self.assertFalse(seen["streamed"])
+        self.assertEqual(status, 200)
+        self.assertEqual(body["choices"][0]["message"]["content"], "ok")
+
     def test_bad_json_returns_400(self):
         mb, port = self._serve()
         req = urllib.request.Request(
