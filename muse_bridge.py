@@ -43,6 +43,7 @@ HERE = Path(__file__).resolve().parent
 PORT = int(os.environ.get("MUSE_BRIDGE_PORT", "11471"))
 EXEC_TIMEOUT = 280
 KEEPALIVE_SEC = 15
+MAX_BODY_BYTES = 4 * 1024 * 1024
 
 DEFAULT_MODELS = [
     "muse-spark-1.3",
@@ -345,7 +346,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                              "/v1/chat/completions/"):
             self.send_error(404)
             return
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self._json(400, {"error": {"message": "bad content-length"}})
+            return
+        if length < 0 or length > MAX_BODY_BYTES:
+            self._json(413, {"error": {"message": "payload too large"}})
+            return
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:
