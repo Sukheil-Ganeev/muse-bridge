@@ -80,7 +80,8 @@ def build_prompt(messages) -> str:
         content = m.get("content", "")
         if isinstance(content, list):
             content = " ".join(
-                p.get("text", "") for p in content if isinstance(p, dict))
+                str(p.get("text") if p.get("text") is not None else "")
+                for p in content if isinstance(p, dict))
         parts.append(f"[{role}]\n{content}")
     return "\n\n".join(parts) or "(empty)"
 
@@ -90,23 +91,27 @@ def run_codex(model: str, prompt: str) -> str:
                                      encoding="utf-8") as pf:
         pf.write(prompt)
         prompt_path = pf.name
-    out_path = str(Path(tempfile.gettempdir()) / "codex-bridge-out.txt")
+    out_path = None
     try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                         encoding="utf-8") as out_fp:
+            out_path = out_fp.name
         with open(prompt_path, encoding="utf-8") as stdin_fp:
             proc = subprocess.run(
                 [CODEX_EXE, "exec", "-s", "read-only", "-m", model,
                  "-o", out_path, "-"],
                 stdin=stdin_fp, capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=EXEC_TIMEOUT)
+        text = Path(out_path).read_text(encoding="utf-8",
+                                       errors="replace").strip()
+        if not text:
+            err = (proc.stderr or "")[-500:]
+            raise RuntimeError("codex exec produced no text. " + err)
+        return text
     finally:
         Path(prompt_path).unlink(missing_ok=True)
-    text = Path(out_path).read_text(encoding="utf-8",
-                                    errors="replace").strip() if Path(
-        out_path).exists() else ""
-    if not text:
-        err = (proc.stderr or "")[-500:]
-        raise RuntimeError("codex exec produced no text. " + err)
-    return text
+        if out_path is not None:
+            Path(out_path).unlink(missing_ok=True)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

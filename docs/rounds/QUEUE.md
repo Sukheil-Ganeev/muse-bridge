@@ -2,7 +2,13 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
-| R009 | Content-Length: только ASCII-цифры | ✅ локальный офлайн-тест |
+| R015 | codex: числовой text-парт в content сводится к строке | 🟡 codex w34 |
+| R014 | codex: уникальный temp-файл ответа на запрос (не общий) | 🟡 codex w34 |
+| R013 | Проверка формы JSON-тела в POST /v1/chat/completions | ✅ [#16](https://github.com/Sukheil-Ganeev/muse-bridge/pull/16) |
+| R012 | PORT env: мусорное значение = warn + дефолт | ✅ [#15](https://github.com/Sukheil-Ganeev/muse-bridge/pull/15) |
+| R011 | terminal-failed с reason в исключении | ✅ [#14](https://github.com/Sukheil-Ganeev/muse-bridge/pull/14) |
+| R010 | content:null не даёт текст «None» | ✅ [#13](https://github.com/Sukheil-Ganeev/muse-bridge/pull/13) |
+| R009 | Content-Length: только ASCII-цифры | ✅ [#12](https://github.com/Sukheil-Ganeev/muse-bridge/pull/12) |
 | R008 | stream: очистка временных файлов при ошибке запуска exec | 🟡 локальная проверка; HTTP-тесты заблокированы sandbox |
 | R007 | stream: только булево true включает SSE | ✅ этот PR |
 | R006 | reasoning как строка = значение усилия (fix crash) | ✅ [#9](https://github.com/Sukheil-Ganeev/muse-bridge/pull/9) |
