@@ -255,6 +255,7 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     deadline.start()
     full = []
     failure = ""
+    exit_status = None
     stop = threading.Event()
 
     def watchdog():
@@ -307,12 +308,12 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             proc.kill()
         Path(prompt_path).unlink(missing_ok=True)
         try:
-            proc.wait(timeout=10)
+            exit_status = proc.wait(timeout=10)
         except Exception:
-            pass
+            exit_status = proc.poll()
         deadline.cancel()
     try:
-        if not "".join(full):
+        if failure or exit_status != 0 or not "".join(full):
             try:
                 err_fp.seek(0)
                 err = err_fp.read()[-500:]
@@ -320,6 +321,10 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 err = ""
             if failure:
                 raise RuntimeError("muse exec failed: " + failure +
+                                   (" " + err if err else ""))
+            if exit_status != 0:
+                raise RuntimeError("muse exec exited with status " +
+                                   str(exit_status) +
                                    (" " + err if err else ""))
             raise RuntimeError("muse exec produced no text. " + err)
         return "".join(full)
