@@ -141,6 +141,12 @@ class CodexPostValidationTests(unittest.TestCase):
     def test_non_object_message_item_returns_400(self):
         self.assertEqual(self._post({"messages": [42]})["status"], 400)
 
+    def test_missing_messages_returns_400(self):
+        self.assertEqual(self._post({})["status"], 400)
+
+    def test_null_messages_returns_400(self):
+        self.assertEqual(self._post({"messages": None})["status"], 400)
+
 
 class CodexContentLengthTests(unittest.TestCase):
     def setUp(self):
@@ -166,6 +172,30 @@ class CodexContentLengthTests(unittest.TestCase):
         resp = self._post_with_length(
             b"{}", str(self.cb.MAX_BODY_BYTES + 1))
         self.assertEqual(resp["status"], 413)
+
+
+class MusePostValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def _post(self, payload):
+        body = json.dumps(payload).encode()
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(self.mb, "run_muse", return_value="ok"):
+            self.mb.Handler.do_POST(handler)
+        return response
+
+    def test_missing_messages_returns_400(self):
+        self.assertEqual(self._post({})["status"], 400)
+
+    def test_null_messages_returns_400(self):
+        self.assertEqual(self._post({"messages": None})["status"], 400)
 
 
 class CodexOutputIsolationTests(unittest.TestCase):
@@ -236,18 +266,20 @@ class ContentLengthParsingTests(unittest.TestCase):
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
         handler.headers = {} if length is None else {"Content-Length": length}
-        handler.rfile = io.BytesIO(b"{}")
+        handler.rfile = io.BytesIO(b'{"messages":[]}')
         handler._json = lambda status, body: response.update(
             status=status, body=body)
         with mock.patch.object(self.mb, "run_muse", return_value="ok"):
             self.mb.Handler.do_POST(handler)
         return response
 
-    def test_missing_header_means_empty_body(self):
-        self.assertEqual(self._post_with_length(None)["status"], 200)
+    def test_missing_header_means_empty_body_and_returns_400(self):
+        self.assertEqual(self._post_with_length(None)["status"], 400)
 
     def test_ascii_decimal_length_is_accepted(self):
-        self.assertEqual(self._post_with_length("2")["status"], 200)
+        self.assertEqual(
+            self._post_with_length(str(len(b'{"messages":[]}')))["status"],
+            200)
 
     def test_non_decimal_forms_are_rejected(self):
         for value in ("1_0", "+10", "", "١٠"):

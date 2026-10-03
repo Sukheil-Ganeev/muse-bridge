@@ -172,8 +172,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(400, {"error": {"message": "payload must be a json object"}})
             return
         messages = payload.get("messages")
-        if messages is not None and (
-                not isinstance(messages, list)
+        if (not isinstance(messages, list)
                 or any(not isinstance(message, dict) for message in messages)):
             self._json(400, {"error": {"message": "messages must be a list of objects"}})
             return
