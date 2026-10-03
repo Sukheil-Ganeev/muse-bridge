@@ -34,13 +34,27 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PORT = int(os.environ.get("MUSE_BRIDGE_PORT", "11471"))
+
+
+def _env_int(name: str, fallback: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return fallback
+    try:
+        return int(raw)
+    except ValueError:
+        print(f"{name}={raw!r} is not an integer, using {fallback}", file=sys.stderr, flush=True)
+        return fallback
+
+
+PORT = _env_int("MUSE_BRIDGE_PORT", 11471)
 EXEC_TIMEOUT = 280
 KEEPALIVE_SEC = 15
 MAX_BODY_BYTES = 4 * 1024 * 1024
