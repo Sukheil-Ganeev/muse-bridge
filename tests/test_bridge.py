@@ -148,6 +148,25 @@ class PostHandlerTests(unittest.TestCase):
             "model": "muse-spark-1.3", "messages": [42, {"role": "user", "content": "hi"}]})
         self.assertEqual(status, 400)
 
+    def test_non_string_text_part_coerced_not_dropped(self):
+        mb, port = self._serve()
+        with mock.patch.object(mb, "run_muse", return_value="ok") as run:
+            status, _ = self._post(port, {
+                "model": "muse-spark-1.3",
+                "messages": [{"role": "user",
+                              "content": [{"type": "text", "text": 123}]}]})
+        self.assertEqual(status, 200)
+        self.assertIn("123", run.call_args[0][1])
+
+    def test_non_string_content_coerced_not_dropped(self):
+        mb, port = self._serve()
+        with mock.patch.object(mb, "run_muse", return_value="ok") as run:
+            status, _ = self._post(port, {
+                "model": "muse-spark-1.3",
+                "messages": [{"role": "user", "content": 7}]})
+        self.assertEqual(status, 200)
+        self.assertIn("7", run.call_args[0][1])
+
     def test_exec_failure_returns_502_json(self):
         mb, port = self._serve()
         with mock.patch.object(mb, "run_muse",
