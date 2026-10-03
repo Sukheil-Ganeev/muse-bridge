@@ -125,6 +125,29 @@ class PostHandlerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(seen["model"], "solo-model")
 
+    def test_non_object_payload_returns_400(self):
+        mb, port = self._serve()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{port}/v1/chat/completions",
+            data=b'["a","b"]', headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            self.fail("expected HTTPError")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+
+    def test_non_list_messages_returns_400(self):
+        mb, port = self._serve()
+        status, _ = self._post(port, {
+            "model": "muse-spark-1.3", "messages": "hello"})
+        self.assertEqual(status, 400)
+
+    def test_non_object_message_item_returns_400(self):
+        mb, port = self._serve()
+        status, _ = self._post(port, {
+            "model": "muse-spark-1.3", "messages": [42, {"role": "user", "content": "hi"}]})
+        self.assertEqual(status, 400)
+
     def test_exec_failure_returns_502_json(self):
         mb, port = self._serve()
         with mock.patch.object(mb, "run_muse",

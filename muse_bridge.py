@@ -359,6 +359,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
+        if not isinstance(payload, dict):
+            self._json(400, {"error": {"message": "payload must be a json object"}})
+            return
+        messages = payload.get("messages")
+        if messages is not None and (
+                not isinstance(messages, list)
+                or any(not isinstance(m, dict) for m in messages)):
+            self._json(400, {"error": {"message": "messages must be a list of objects"}})
+            return
         model = str(payload.get("model") or DEFAULT_MODEL)
         if model not in MODELS:
             model = DEFAULT_MODEL
