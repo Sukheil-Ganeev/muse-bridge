@@ -59,6 +59,16 @@ EXEC_TIMEOUT = 280
 KEEPALIVE_SEC = 15
 MAX_BODY_BYTES = 4 * 1024 * 1024
 
+
+def _no_duplicate_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate key: {key}")
+        result[key] = value
+    return result
+
+
 DEFAULT_MODELS = [
     "muse-spark-1.3",
     "muse-spark-1.2",
@@ -422,7 +432,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(400, {
                     "error": {"message": "incomplete request body"}})
                 return
-            payload = json.loads(body or b"{}")
+            payload = json.loads(
+                body or b"{}", object_pairs_hook=_no_duplicate_object)
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
