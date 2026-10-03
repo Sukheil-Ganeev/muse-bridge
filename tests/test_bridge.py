@@ -3,6 +3,7 @@
 import importlib
 import json
 import os
+import socket
 import sys
 import threading
 import unittest
@@ -144,6 +145,32 @@ class PostHandlerTests(unittest.TestCase):
             self.fail("expected HTTPError")
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 400)
+
+    def _raw_post(self, port, headers: bytes):
+        with socket.create_connection(("127.0.0.1", port), timeout=10) as s:
+            s.sendall(b"POST /v1/chat/completions HTTP/1.1\r\n"
+                      b"Host: 127.0.0.1\r\n" + headers + b"\r\n")
+            chunks = []
+            while True:
+                try:
+                    data = s.recv(4096)
+                except socket.timeout:
+                    break
+                if not data:
+                    break
+                chunks.append(data)
+        return b"".join(chunks)
+
+    def test_bad_content_length_returns_400_not_hang(self):
+        mb, port = self._serve()
+        resp = self._raw_post(port, b"Content-Length: abc\r\n\r\n")
+        self.assertTrue(resp.startswith(b"HTTP/1.0 400") or
+                        resp.startswith(b"HTTP/1.1 400"), resp[:80])
+
+    def test_oversized_content_length_returns_413(self):
+        mb, port = self._serve()
+        resp = self._raw_post(port, b"Content-Length: 99999999\r\n\r\n")
+        self.assertIn(b" 413 ", resp.split(b"\r\n")[0])
 
 
 class _FakeStdout:
