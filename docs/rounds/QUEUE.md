@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R009 | Content-Length: только ASCII-цифры | ✅ локальный офлайн-тест |
 | R008 | stream: очистка временных файлов при ошибке запуска exec | 🟡 локальная проверка; HTTP-тесты заблокированы sandbox |
 | R007 | stream: только булево true включает SSE | ✅ этот PR |
 | R006 | reasoning как строка = значение усилия (fix crash) | ✅ [#9](https://github.com/Sukheil-Ganeev/muse-bridge/pull/9) |

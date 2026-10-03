@@ -138,6 +138,14 @@ def build_prompt(messages) -> str:
     return "\n\n".join(parts) or "(empty)"
 
 
+def _parse_content_length(value):
+    if value is None:
+        return 0
+    if not value or not value.isascii() or not value.isdecimal():
+        raise ValueError("bad content-length")
+    return int(value)
+
+
 def run_muse(model: str, prompt: str, effort: str = "high") -> str:
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
                                      encoding="utf-8") as pf:
@@ -359,7 +367,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
         try:
-            length = int(self.headers.get("Content-Length") or 0)
+            length = _parse_content_length(
+                self.headers.get("Content-Length"))
         except ValueError:
             self._json(400, {"error": {"message": "bad content-length"}})
             return
