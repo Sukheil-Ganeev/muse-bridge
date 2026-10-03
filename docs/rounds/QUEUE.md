@@ -2,7 +2,8 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
-| R006 | reasoning как строка = значение усилия (fix crash) | ✅ этот PR |
+| R007 | stream: только булево true включает SSE | ✅ этот PR |
+| R006 | reasoning как строка = значение усилия (fix crash) | ✅ [#9](https://github.com/Sukheil-Ganeev/muse-bridge/pull/9) |
 | R004 | Проверка формы JSON-тела в POST | ✅ bf212c1 (прямой коммит, ошибка процесса — без PR) |
 | R003 | Лимит и строгий разбор Content-Length в POST | ✅ [#5](https://github.com/Sukheil-Ganeev/muse-bridge/pull/5) |
 | R002 | Отмена exec при обрыве клиента + уборка temp-файла | ✅ [#3](https://github.com/Sukheil-Ganeev/muse-bridge/pull/3) |
