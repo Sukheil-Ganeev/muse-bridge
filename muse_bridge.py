@@ -181,15 +181,22 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
         prompt_path = pf.name
     # stderr goes to a temp file (not a pipe) so a chatty muse cannot block
     # the child by filling the pipe buffer while we only read stdout.
-    err_fp = tempfile.TemporaryFile("w+", encoding="utf-8",
-                                    errors="replace")
-    proc = subprocess.Popen(
-        _muse_command(["exec", "--json", "--model", model,
-                       "--reasoning-effort", effort] + TAME_FLAGS +
-                      ["--prompt-file", prompt_path]),
-        stdout=subprocess.PIPE, stderr=err_fp,
-        text=True, encoding="utf-8", errors="replace",
-        bufsize=1)
+    err_fp = None
+    try:
+        err_fp = tempfile.TemporaryFile("w+", encoding="utf-8",
+                                        errors="replace")
+        proc = subprocess.Popen(
+            _muse_command(["exec", "--json", "--model", model,
+                           "--reasoning-effort", effort] + TAME_FLAGS +
+                          ["--prompt-file", prompt_path]),
+            stdout=subprocess.PIPE, stderr=err_fp,
+            text=True, encoding="utf-8", errors="replace",
+            bufsize=1)
+    except BaseException:
+        Path(prompt_path).unlink(missing_ok=True)
+        if err_fp is not None:
+            err_fp.close()
+        raise
     print(f"exec spawned model={model} effort={effort}", flush=True)
     deadline = threading.Timer(EXEC_TIMEOUT, proc.kill)
     deadline.daemon = True

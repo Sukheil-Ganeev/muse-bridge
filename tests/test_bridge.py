@@ -324,6 +324,33 @@ class StreamAbortTests(unittest.TestCase):
         self.assertFalse(proc.killed)
         self.assertFalse(os.path.exists(recorded["path"]))
 
+    def test_spawn_failure_closes_stderr_and_removes_prompt_file(self):
+        recorded = {}
+        real_ntf = self.mb.tempfile.NamedTemporaryFile
+        real_tf = self.mb.tempfile.TemporaryFile
+
+        def spy_named_temp(*args, **kwargs):
+            f = real_ntf(*args, **kwargs)
+            recorded["path"] = f.name
+            return f
+
+        def spy_temp(*args, **kwargs):
+            f = real_tf(*args, **kwargs)
+            recorded["err_fp"] = f
+            return f
+
+        with mock.patch.object(self.mb.tempfile, "NamedTemporaryFile",
+                               side_effect=spy_named_temp), \
+             mock.patch.object(self.mb.tempfile, "TemporaryFile",
+                               side_effect=spy_temp), \
+             mock.patch.object(self.mb.subprocess, "Popen",
+                               side_effect=OSError("cannot spawn")):
+            with self.assertRaisesRegex(OSError, "cannot spawn"):
+                self.mb.stream_muse("m", "p", "high", lambda _: None)
+
+        self.assertFalse(os.path.exists(recorded["path"]))
+        self.assertTrue(recorded["err_fp"].closed)
+
 
 class HealthTests(unittest.TestCase):
     def test_health_and_models(self):
