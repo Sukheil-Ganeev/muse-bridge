@@ -5,6 +5,10 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRIDGE="$REPO/muse_bridge.py"
+BRIDGE_XML="$BRIDGE"
+BRIDGE_XML=${BRIDGE_XML//&/\&amp;}
+BRIDGE_XML=${BRIDGE_XML//</\&lt;}
+BRIDGE_XML=${BRIDGE_XML//>/\&gt;}
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 not found. Install it first (e.g. brew install python)."
@@ -24,7 +28,7 @@ cat > "$PLIST" <<EOF
   <array>
     <string>/usr/bin/env</string>
     <string>python3</string>
-    <string>$BRIDGE</string>
+    <string>$BRIDGE_XML</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
