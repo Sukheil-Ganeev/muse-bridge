@@ -116,8 +116,13 @@ def _muse_command(args):
 def extract_effort(payload) -> str:
     raw = payload.get("reasoning_effort")
     if raw is None:
-        reasoning = payload.get("reasoning") or {}
-        raw = reasoning.get("effort", payload.get("effort"))
+        reasoning = payload.get("reasoning")
+        if isinstance(reasoning, dict):
+            raw = reasoning.get("effort", payload.get("effort"))
+        elif reasoning is not None:
+            raw = reasoning
+        else:
+            raw = payload.get("effort")
     return EFFORT_MAP.get(str(raw or "high").lower(), "high")
 
 

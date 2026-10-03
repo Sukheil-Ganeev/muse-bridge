@@ -39,6 +39,11 @@ class ExtractEffortTests(unittest.TestCase):
             self.mb.extract_effort({"reasoning": {"effort": "xhigh"}}),
             "xhigh")
 
+    def test_reasoning_string_is_effort(self):
+        # Некоторые клиенты шлют "reasoning": "low" — не словарь.
+        self.assertEqual(
+            self.mb.extract_effort({"reasoning": "low"}), "low")
+
     def test_max_and_ultra_cap_at_xhigh(self):
         self.assertEqual(
             self.mb.extract_effort({"reasoning_effort": "max"}), "xhigh")
