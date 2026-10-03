@@ -75,6 +75,18 @@ class BuildPromptTests(unittest.TestCase):
             {"type": "text", "text": "a"}, {"type": "text", "text": "b"}]}])
         self.assertEqual(out, "[user]\na b")
 
+    def test_null_content_is_empty_not_literal_none(self):
+        out = self.mb.build_prompt([
+            {"role": "assistant", "content": None}])
+        self.assertNotIn("None", out)
+        self.assertEqual(out, "[assistant]\n")
+
+    def test_null_text_in_parts_is_empty(self):
+        out = self.mb.build_prompt([{"role": "user", "content": [
+            {"type": "text", "text": None}, {"type": "text", "text": "x"}]}])
+        self.assertNotIn("None", out)
+        self.assertEqual(out, "[user]\nx")
+
 
 class ModelListTests(unittest.TestCase):
     def test_single_model_env_parses(self):
