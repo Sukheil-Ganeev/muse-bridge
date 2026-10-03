@@ -24,6 +24,11 @@ def fresh_bridge(models_env=None):
         return importlib.import_module("muse_bridge")
 
 
+def fresh_codex_bridge():
+    sys.modules.pop("codex_bridge", None)
+    return importlib.import_module("codex_bridge")
+
+
 class ExtractEffortTests(unittest.TestCase):
     def setUp(self):
         self.mb = fresh_bridge()
@@ -96,6 +101,33 @@ class ModelListTests(unittest.TestCase):
     def test_empty_env_falls_back_to_defaults(self):
         mb = fresh_bridge(" , ,")
         self.assertEqual(mb.MODELS, mb.DEFAULT_MODELS)
+
+
+class CodexPostValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def _post(self, payload):
+        body = json.dumps(payload).encode()
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(self.cb, "run_codex", return_value="ok"):
+            self.cb.Handler.do_POST(handler)
+        return response
+
+    def test_non_object_payload_returns_400(self):
+        self.assertEqual(self._post(["a", "b"])["status"], 400)
+
+    def test_non_list_messages_returns_400(self):
+        self.assertEqual(self._post({"messages": "hello"})["status"], 400)
+
+    def test_non_object_message_item_returns_400(self):
+        self.assertEqual(self._post({"messages": [42]})["status"], 400)
 
 
 class TerminalFailureTests(unittest.TestCase):
