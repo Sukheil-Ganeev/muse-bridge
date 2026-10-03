@@ -48,6 +48,7 @@ def _env_int(name: str, fallback: int) -> int:
 
 PORT = _env_int("CODEX_BRIDGE_PORT", 11472)
 EXEC_TIMEOUT = 280
+MAX_BODY_BYTES = 4 * 1024 * 1024
 
 MODELS = [
     "gpt-5.1-codex-max",
@@ -71,6 +72,14 @@ def find_codex() -> str:
 
 
 CODEX_EXE = find_codex()
+
+
+def _parse_content_length(value):
+    if value is None:
+        return 0
+    if not value or not value.isascii() or not value.isdecimal():
+        raise ValueError("bad content-length")
+    return int(value)
 
 
 def build_prompt(messages) -> str:
@@ -145,7 +154,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                              "/v1/chat/completions/"):
             self.send_error(404)
             return
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = _parse_content_length(
+                self.headers.get("Content-Length"))
+        except ValueError:
+            self._json(400, {"error": {"message": "bad content-length"}})
+            return
+        if length > MAX_BODY_BYTES:
+            self._json(413, {"error": {"message": "payload too large"}})
+            return
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
         except Exception:

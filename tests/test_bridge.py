@@ -142,6 +142,32 @@ class CodexPostValidationTests(unittest.TestCase):
         self.assertEqual(self._post({"messages": [42]})["status"], 400)
 
 
+class CodexContentLengthTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def _post_with_length(self, body, length_header):
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": length_header}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(self.cb, "run_codex", return_value="ok"):
+            self.cb.Handler.do_POST(handler)
+        return response
+
+    def test_garbage_content_length_returns_400(self):
+        resp = self._post_with_length(b"{}", "not-a-number")
+        self.assertEqual(resp["status"], 400)
+
+    def test_oversized_content_length_returns_413(self):
+        resp = self._post_with_length(
+            b"{}", str(self.cb.MAX_BODY_BYTES + 1))
+        self.assertEqual(resp["status"], 413)
+
+
 class CodexOutputIsolationTests(unittest.TestCase):
     def setUp(self):
         self.cb = fresh_codex_bridge()
