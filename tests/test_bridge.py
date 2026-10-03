@@ -93,6 +93,12 @@ class BuildPromptTests(unittest.TestCase):
         self.assertNotIn("None", out)
         self.assertEqual(out, "[user]\nx")
 
+    def test_falsey_non_string_text_parts_are_preserved(self):
+        out = self.mb.build_prompt([{"role": "user", "content": [
+            {"type": "text", "text": 0},
+            {"type": "text", "text": False}]}])
+        self.assertEqual(out, "[user]\n0 False")
+
 
 class ModelListTests(unittest.TestCase):
     def test_single_model_env_parses(self):
