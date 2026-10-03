@@ -148,6 +148,18 @@ class CodexPostValidationTests(unittest.TestCase):
     def test_null_messages_returns_400(self):
         self.assertEqual(self._post({"messages": None})["status"], 400)
 
+    def test_duplicate_keys_returns_400(self):
+        body = b'{"model": "a", "model": "b", "messages": []}'
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        self.cb.Handler.do_POST(handler)
+        self.assertEqual(response["status"], 400)
+
 
 class CodexContentLengthTests(unittest.TestCase):
     def setUp(self):
@@ -197,6 +209,18 @@ class MusePostValidationTests(unittest.TestCase):
 
     def test_null_messages_returns_400(self):
         self.assertEqual(self._post({"messages": None})["status"], 400)
+
+    def test_duplicate_keys_returns_400(self):
+        body = b'{"messages": [], "stream": true, "stream": false}'
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        self.mb.Handler.do_POST(handler)
+        self.assertEqual(response["status"], 400)
 
 
 class TruncatedBodyTests(unittest.TestCase):

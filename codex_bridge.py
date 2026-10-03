@@ -50,6 +50,16 @@ PORT = _env_int("CODEX_BRIDGE_PORT", 11472)
 EXEC_TIMEOUT = 280
 MAX_BODY_BYTES = 4 * 1024 * 1024
 
+
+def _no_duplicate_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate key: {key}")
+        result[key] = value
+    return result
+
+
 MODELS = [
     "gpt-5.1-codex-max",
     "gpt-5.1-codex-mini",
@@ -178,7 +188,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(400, {
                     "error": {"message": "incomplete request body"}})
                 return
-            payload = json.loads(body or b"{}")
+            payload = json.loads(
+                body or b"{}", object_pairs_hook=_no_duplicate_object)
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
