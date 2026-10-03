@@ -164,6 +164,7 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
     finally:
         Path(prompt_path).unlink(missing_ok=True)
     text = ""
+    failure = ""
     for line in (proc.stdout or "").splitlines():
         line = line.strip()
         if not line.startswith("{"):
@@ -174,8 +175,15 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
             continue
         if ev.get("payload_type") == "run.terminal.completed":
             text = ((ev.get("payload") or {}).get("text") or text) or ""
+        elif ev.get("payload_type") == "run.terminal.failed":
+            payload = ev.get("payload")
+            if isinstance(payload, dict) and payload.get("reason"):
+                failure = str(payload["reason"])[:200]
     if not text:
         err = (proc.stderr or "")[-500:]
+        if failure:
+            raise RuntimeError("muse exec failed: " + failure +
+                               (" " + err if err else ""))
         raise RuntimeError("muse exec produced no text. " + err)
     return text
 
@@ -213,6 +221,7 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     deadline.daemon = True
     deadline.start()
     full = []
+    failure = ""
     stop = threading.Event()
 
     def watchdog():
@@ -250,8 +259,11 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                     full.append(tail)
                     on_delta(tail)
             elif pt == "run.terminal.failed":
-                reason = str((ev.get("payload") or {}).get("reason"))[:200]
-                print(f"exec terminal-failed: {reason}", flush=True)
+                payload = ev.get("payload")
+                reason = payload.get("reason") if isinstance(payload, dict) else None
+                if reason:
+                    failure = str(reason)[:200]
+                    print(f"exec terminal-failed: {failure}", flush=True)
     finally:
         # Every exit path — client abort, parse errors, terminal failure,
         # deadline kill — lands here: stop the watchdog, cancel a still-
@@ -273,6 +285,9 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 err = err_fp.read()[-500:]
             except Exception:
                 err = ""
+            if failure:
+                raise RuntimeError("muse exec failed: " + failure +
+                                   (" " + err if err else ""))
             raise RuntimeError("muse exec produced no text. " + err)
         return "".join(full)
     finally:

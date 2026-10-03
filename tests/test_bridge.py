@@ -98,6 +98,19 @@ class ModelListTests(unittest.TestCase):
         self.assertEqual(mb.MODELS, mb.DEFAULT_MODELS)
 
 
+class TerminalFailureTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def test_terminal_failure_reason_is_reported(self):
+        event = json.dumps({"payload_type": "run.terminal.failed",
+                            "payload": {"reason": "quota exceeded"}})
+        proc = mock.Mock(stdout=event + "\n", stderr="")
+        with mock.patch.object(self.mb.subprocess, "run", return_value=proc):
+            with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
+                self.mb.run_muse("m", "p")
+
+
 class ContentLengthParsingTests(unittest.TestCase):
     def setUp(self):
         self.mb = fresh_bridge()
@@ -363,6 +376,15 @@ class StreamAbortTests(unittest.TestCase):
         self.assertEqual(out, "hello")
         self.assertEqual(got, ["he", "llo"])
         self.assertFalse(proc.killed)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
+    def test_terminal_failure_reason_is_reported(self):
+        event = json.dumps({"payload_type": "run.terminal.failed",
+                            "payload": {"reason": "quota exceeded"}})
+        proc = _FakeProc([event])
+        recorded = self._patched(proc)
+        with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
+            self.mb.stream_muse("m", "p", "high", lambda _: None)
         self.assertFalse(os.path.exists(recorded["path"]))
 
     def test_spawn_failure_closes_stderr_and_removes_prompt_file(self):
