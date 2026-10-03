@@ -576,20 +576,21 @@ class _FakeStdout:
 class _FakeProc:
     """Stand-in for subprocess.Popen: stdout closes when drained."""
 
-    def __init__(self, events):
+    def __init__(self, events, returncode=0):
         self.stdout = _FakeStdout(events)
         self.killed = False
         self.wait_calls = []
+        self.returncode = returncode
 
     def poll(self):
-        return 0 if (self.killed or self.stdout.closed) else None
+        return self.returncode if (self.killed or self.stdout.closed) else None
 
     def kill(self):
         self.killed = True
 
     def wait(self, timeout=None):
         self.wait_calls.append(timeout)
-        return 0
+        return self.returncode
 
 
 def _delta(text):
@@ -652,6 +653,22 @@ class StreamAbortTests(unittest.TestCase):
         proc = _FakeProc([event])
         recorded = self._patched(proc)
         with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
+            self.mb.stream_muse("m", "p", "high", lambda _: None)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
+    def test_terminal_failure_after_partial_output_is_reported(self):
+        event = json.dumps({"payload_type": "run.terminal.failed",
+                            "payload": {"reason": "quota exceeded"}})
+        proc = _FakeProc([_delta("partial"), event])
+        recorded = self._patched(proc)
+        with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
+            self.mb.stream_muse("m", "p", "high", lambda _: None)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
+    def test_nonzero_process_exit_after_partial_output_is_reported(self):
+        proc = _FakeProc([_delta("partial")], returncode=17)
+        recorded = self._patched(proc)
+        with self.assertRaisesRegex(RuntimeError, "exited with status 17"):
             self.mb.stream_muse("m", "p", "high", lambda _: None)
         self.assertFalse(os.path.exists(recorded["path"]))
 
