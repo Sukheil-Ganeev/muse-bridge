@@ -163,6 +163,15 @@ def _parse_content_length(value):
     return int(value)
 
 
+def _content_length_header(headers):
+    get_all = getattr(headers, "get_all", None)
+    values = get_all("Content-Length") if get_all else None
+    if values and any(value.strip() != values[0].strip()
+                      for value in values[1:]):
+        raise ValueError("conflicting content-length")
+    return values[0] if values else headers.get("Content-Length")
+
+
 def run_muse(model: str, prompt: str, effort: str = "high") -> str:
     with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
                                      encoding="utf-8") as pf:
@@ -400,7 +409,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         try:
             length = _parse_content_length(
-                self.headers.get("Content-Length"))
+                _content_length_header(self.headers))
         except ValueError:
             self._json(400, {"error": {"message": "bad content-length"}})
             return
@@ -408,7 +417,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(413, {"error": {"message": "payload too large"}})
             return
         try:
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            body = self.rfile.read(length)
+            if len(body) != length:
+                self._json(400, {
+                    "error": {"message": "incomplete request body"}})
+                return
+            payload = json.loads(body or b"{}")
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
