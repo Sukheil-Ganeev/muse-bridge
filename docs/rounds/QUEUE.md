@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R086 | POST: отклонять Transfer-Encoding, который мост не декодирует | ✅ локально, без commit/push |
 | R015 | codex: числовой text-парт в content сводится к строке | ✅ [#17](https://github.com/Sukheil-Ganeev/muse-bridge/pull/17) |
 | R014 | codex: уникальный temp-файл ответа на запрос (не общий) | ✅ [#17](https://github.com/Sukheil-Ganeev/muse-bridge/pull/17) |
 | R013 | Проверка формы JSON-тела в POST /v1/chat/completions | ✅ [#16](https://github.com/Sukheil-Ganeev/muse-bridge/pull/16) |

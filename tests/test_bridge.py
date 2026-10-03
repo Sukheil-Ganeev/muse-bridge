@@ -288,6 +288,36 @@ class DuplicateContentLengthTests(unittest.TestCase):
         run.assert_not_called()
 
 
+class TransferEncodingTests(unittest.TestCase):
+    def _post_with_transfer_encoding(self, bridge, runner_name):
+        body = b'{"messages":[]}'
+        headers = Message()
+        headers.add_header("Content-Length", str(len(body)))
+        headers.add_header("Transfer-Encoding", "chunked")
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = headers
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(bridge, runner_name, return_value="ok") as run:
+            bridge.Handler.do_POST(handler)
+        return response, run
+
+    def test_muse_rejects_transfer_encoding_without_running_cli(self):
+        bridge = fresh_bridge()
+        response, run = self._post_with_transfer_encoding(bridge, "run_muse")
+        self.assertEqual(response["status"], 400)
+        run.assert_not_called()
+
+    def test_codex_rejects_transfer_encoding_without_running_cli(self):
+        bridge = fresh_codex_bridge()
+        response, run = self._post_with_transfer_encoding(bridge, "run_codex")
+        self.assertEqual(response["status"], 400)
+        run.assert_not_called()
+
+
 class CodexOutputIsolationTests(unittest.TestCase):
     def setUp(self):
         self.cb = fresh_codex_bridge()
