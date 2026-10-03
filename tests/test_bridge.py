@@ -1,6 +1,7 @@
 """Contract tests for muse_bridge — offline, no muse CLI needed."""
 
 import importlib
+import io
 import json
 import os
 import socket
@@ -83,6 +84,34 @@ class ModelListTests(unittest.TestCase):
     def test_empty_env_falls_back_to_defaults(self):
         mb = fresh_bridge(" , ,")
         self.assertEqual(mb.MODELS, mb.DEFAULT_MODELS)
+
+
+class ContentLengthParsingTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def _post_with_length(self, length):
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {} if length is None else {"Content-Length": length}
+        handler.rfile = io.BytesIO(b"{}")
+        handler._json = lambda status, body: response.update(
+            status=status, body=body)
+        with mock.patch.object(self.mb, "run_muse", return_value="ok"):
+            self.mb.Handler.do_POST(handler)
+        return response
+
+    def test_missing_header_means_empty_body(self):
+        self.assertEqual(self._post_with_length(None)["status"], 200)
+
+    def test_ascii_decimal_length_is_accepted(self):
+        self.assertEqual(self._post_with_length("2")["status"], 200)
+
+    def test_non_decimal_forms_are_rejected(self):
+        for value in ("1_0", "+10", "", "١٠"):
+            with self.subTest(value=value):
+                self.assertEqual(self._post_with_length(value)["status"], 400)
 
 
 class PostHandlerTests(unittest.TestCase):
