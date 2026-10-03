@@ -417,6 +417,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                              "/v1/chat/completions/"):
             self.send_error(404)
             return
+        if self.headers.get("Transfer-Encoding") is not None:
+            self._json(400, {
+                "error": {"message": "transfer-encoding is not supported"}})
+            return
         try:
             length = _parse_content_length(
                 _content_length_header(self.headers))
