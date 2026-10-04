@@ -115,12 +115,13 @@ def build_prompt(messages) -> str:
 
 
 def run_codex(model: str, prompt: str) -> str:
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
-                                     encoding="utf-8") as pf:
-        pf.write(prompt)
-        prompt_path = pf.name
+    prompt_path = None
     out_path = None
     try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                         encoding="utf-8") as pf:
+            prompt_path = pf.name
+            pf.write(prompt)
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
                                          encoding="utf-8") as out_fp:
             out_path = out_fp.name
@@ -137,7 +138,8 @@ def run_codex(model: str, prompt: str) -> str:
             raise RuntimeError("codex exec produced no text. " + err)
         return text
     finally:
-        Path(prompt_path).unlink(missing_ok=True)
+        if prompt_path is not None:
+            Path(prompt_path).unlink(missing_ok=True)
         if out_path is not None:
             Path(out_path).unlink(missing_ok=True)
 

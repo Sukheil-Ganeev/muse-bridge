@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import sys
+import tempfile
 import threading
 import unittest
 import urllib.request
@@ -377,6 +378,44 @@ class TerminalFailureTests(unittest.TestCase):
                 self.mb.run_muse("m", "p")
 
 
+class PromptTempCreationFailureTests(unittest.TestCase):
+    def test_muse_removes_temp_file_when_prompt_write_fails(self):
+        mb = fresh_bridge()
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(mb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(mb.subprocess, "run") as run:
+                with self.assertRaises(UnicodeEncodeError):
+                    mb.run_muse("m", "prefix\ud800")
+            run.assert_not_called()
+            self.assertEqual(os.listdir(temp_dir), [])
+
+    def test_stream_muse_removes_temp_file_when_prompt_write_fails(self):
+        mb = fresh_bridge()
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(mb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(mb.subprocess, "Popen") as popen:
+                with self.assertRaises(UnicodeEncodeError):
+                    mb.stream_muse("m", "prefix\ud800", "high", lambda _: None)
+            popen.assert_not_called()
+            self.assertEqual(os.listdir(temp_dir), [])
+
+    def test_codex_removes_temp_file_when_prompt_write_fails(self):
+        cb = fresh_codex_bridge()
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(cb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(cb.subprocess, "run") as run:
+                with self.assertRaises(UnicodeEncodeError):
+                    cb.run_codex("m", "prefix\ud800")
+            run.assert_not_called()
+            self.assertEqual(os.listdir(temp_dir), [])
+
+
 class ContentLengthParsingTests(unittest.TestCase):
     def setUp(self):
         self.mb = fresh_bridge()
@@ -636,6 +675,32 @@ class StreamAbortTests(unittest.TestCase):
         self.assertTrue(proc.killed)
         self.assertTrue(proc.wait_calls)
         self.assertFalse(os.path.exists(recorded["path"]))
+
+    def test_client_abort_closes_stderr_temp_file(self):
+        proc = _FakeProc([_delta("he")])
+        recorded = {}
+        real_tempfile = self.mb.tempfile.TemporaryFile
+
+        def spy_tempfile(*args, **kwargs):
+            fp = real_tempfile(*args, **kwargs)
+            recorded["stderr"] = fp
+            return fp
+
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(self.mb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.mb.tempfile, "TemporaryFile",
+                                   side_effect=spy_tempfile), \
+                 mock.patch.object(self.mb.subprocess, "Popen",
+                                   return_value=proc):
+                def abort(_piece):
+                    raise BrokenPipeError("client gone")
+
+                with self.assertRaises(BrokenPipeError):
+                    self.mb.stream_muse("m", "p", "high", abort)
+
+        self.assertTrue(recorded["stderr"].closed)
 
     def test_clean_stream_returns_text_without_kill(self):
         proc = _FakeProc([_delta("he"), _delta("llo")])
