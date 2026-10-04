@@ -212,13 +212,15 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
             text = ((ev.get("payload") or {}).get("text") or text) or ""
         elif ev.get("payload_type") == "run.terminal.failed":
             payload = ev.get("payload")
-            if isinstance(payload, dict) and payload.get("reason"):
-                failure = str(payload["reason"])[:200]
+            reason = (payload.get("reason") if isinstance(payload, dict)
+                      else None)
+            failure = str(reason)[:200] if reason else "unknown reason"
+    if failure:
+        err = (proc.stderr or "")[-500:]
+        raise RuntimeError("muse exec failed: " + failure +
+                           (" " + err if err else ""))
     if not text:
         err = (proc.stderr or "")[-500:]
-        if failure:
-            raise RuntimeError("muse exec failed: " + failure +
-                               (" " + err if err else ""))
         raise RuntimeError("muse exec produced no text. " + err)
     return text
 
