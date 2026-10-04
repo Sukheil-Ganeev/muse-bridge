@@ -227,6 +227,140 @@ class RequestHeaderTimeoutTests(unittest.TestCase):
         self._assert_handler_setup_sets_idle_timeout(fresh_codex_bridge())
 
 
+class AbsoluteRequestHeaderDeadlineTests(unittest.TestCase):
+    class FakeClock:
+        def __init__(self):
+            self.now = 0.0
+
+        def monotonic(self):
+            return self.now
+
+    class FakeSocket:
+        def __init__(self):
+            self.timeout = None
+            self.timeouts = []
+
+        def settimeout(self, value):
+            self.timeout = value
+            self.timeouts.append(value)
+
+    class SlowReader:
+        def __init__(self, clock, connection):
+            self.clock = clock
+            self.connection = connection
+            self.read_count = 0
+
+        def read(self, _size):
+            delay = 0.4
+            self.read_count += 1
+            if delay > self.connection.timeout:
+                self.clock.now += self.connection.timeout
+                raise socket.timeout("deadline")
+            self.clock.now += delay
+            return b"x"
+
+    def _assert_absolute_deadline(self, module):
+        clock = self.FakeClock()
+        connection = self.FakeSocket()
+        reader = self.SlowReader(clock, connection)
+        with mock.patch.object(module.time, "monotonic",
+                               side_effect=clock.monotonic):
+            guarded = module._HeaderDeadlineReader(
+                reader, connection, timeout=1.0)
+            with self.assertRaises(socket.timeout):
+                guarded.readline()
+        self.assertEqual(reader.read_count, 3)
+        self.assertAlmostEqual(clock.now, 1.0)
+        self.assertEqual(len(connection.timeouts), 3)
+        self.assertAlmostEqual(connection.timeouts[-1], 0.2)
+
+    def test_muse_header_reader_uses_one_absolute_deadline(self):
+        self._assert_absolute_deadline(fresh_bridge())
+
+    def test_codex_header_reader_uses_one_absolute_deadline(self):
+        self._assert_absolute_deadline(fresh_codex_bridge())
+
+    def _assert_handler_wraps_header_reads(self, module):
+        connection = self.FakeSocket()
+        original = io.BytesIO(b"GET /health HTTP/1.1\r\n")
+        handler = module.Handler.__new__(module.Handler)
+        handler.rfile = original
+        handler.connection = connection
+
+        def observe_reader(instance):
+            instance.observed_reader = instance.rfile
+
+        with mock.patch.object(module.http.server.BaseHTTPRequestHandler,
+                               "handle_one_request", observe_reader):
+            module.Handler.handle_one_request(handler)
+
+        self.assertIsInstance(handler.observed_reader,
+                              module._HeaderDeadlineReader)
+        self.assertIs(handler.rfile, original)
+        self.assertEqual(connection.timeouts[-1], module.REQUEST_IDLE_TIMEOUT)
+
+    def test_muse_handler_applies_deadline_to_each_request(self):
+        self._assert_handler_wraps_header_reads(fresh_bridge())
+
+    def test_codex_handler_applies_deadline_to_each_request(self):
+        self._assert_handler_wraps_header_reads(fresh_codex_bridge())
+
+    def _assert_handler_parses_request(self, module):
+        connection = self.FakeSocket()
+        handler = module.Handler.__new__(module.Handler)
+        handler.rfile = io.BytesIO(
+            b"GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n")
+        handler.wfile = io.BytesIO()
+        handler.connection = connection
+        handler.client_address = ("127.0.0.1", 12345)
+        handler.close_connection = True
+
+        module.Handler.handle_one_request(handler)
+
+        self.assertEqual(handler.path, "/health")
+        self.assertIn(b" 200 OK\r\n", handler.wfile.getvalue())
+        self.assertEqual(connection.timeouts[-1], module.REQUEST_IDLE_TIMEOUT)
+
+    def test_muse_handler_parses_request_with_wrapped_reader(self):
+        self._assert_handler_parses_request(fresh_bridge())
+
+    def test_codex_handler_parses_request_with_wrapped_reader(self):
+        self._assert_handler_parses_request(fresh_codex_bridge())
+
+    def _assert_parse_restores_idle_timeout(self, module, raises_timeout):
+        connection = self.FakeSocket()
+        handler = module.Handler.__new__(module.Handler)
+        handler.connection = connection
+        handler.close_connection = False
+        errors = []
+        handler.send_error = lambda *args: errors.append(args)
+        base_handler = module.http.server.BaseHTTPRequestHandler
+        side_effect = (socket.timeout("deadline") if raises_timeout else None)
+        with mock.patch.object(base_handler, "parse_request",
+                               side_effect=side_effect,
+                               return_value=True):
+            result = module.Handler.parse_request(handler)
+        self.assertEqual(connection.timeouts[-1], module.REQUEST_IDLE_TIMEOUT)
+        if raises_timeout:
+            self.assertFalse(result)
+            self.assertTrue(handler.close_connection)
+            self.assertEqual(errors[0][0], 408)
+        else:
+            self.assertTrue(result)
+
+    def test_muse_parse_restores_idle_timeout_after_headers(self):
+        self._assert_parse_restores_idle_timeout(fresh_bridge(), False)
+
+    def test_codex_parse_restores_idle_timeout_after_headers(self):
+        self._assert_parse_restores_idle_timeout(fresh_codex_bridge(), False)
+
+    def test_muse_header_timeout_returns_408_and_closes(self):
+        self._assert_parse_restores_idle_timeout(fresh_bridge(), True)
+
+    def test_codex_header_timeout_returns_408_and_closes(self):
+        self._assert_parse_restores_idle_timeout(fresh_codex_bridge(), True)
+
+
 class PostBodyDeadlineTests(unittest.TestCase):
     class FakeConnection:
         def __init__(self, timeout=7):
