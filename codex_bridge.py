@@ -255,6 +255,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if length > MAX_BODY_BYTES:
             self._json(413, {"error": {"message": "payload too large"}})
             return
+        get_all = getattr(self.headers, "get_all", None)
+        expect_values = get_all("Expect") if get_all else None
+        if expect_values is None:
+            expect = self.headers.get("Expect")
+            expect_values = [expect] if expect is not None else []
+        if expect_values:
+            if (len(expect_values) != 1
+                    or expect_values[0].strip().lower() != "100-continue"
+                    or self.request_version != "HTTP/1.1"):
+                self._json(417, {
+                    "error": {"message": "expectation is not supported"}})
+                return
+            self.wfile.write(b"HTTP/1.1 100 Continue\r\n\r\n")
+            self.wfile.flush()
         try:
             body = _read_request_body(
                 self.rfile, getattr(self, "connection", None), length)
