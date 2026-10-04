@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R226 | codex: content:null не даёт текст «None» | ✅ локально, без commit/push |
 | R216 | stream: cleanup после сбоя запуска watchdog | ✅ локально, без commit/push |
 | R196 | macOS plist: отклонять управляющие символы в пути | ✅ локально, без commit/push |
 | R186 | stream: failed без причины не должен принимать частичный текст | ✅ локально, без commit/push |
