@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R166 | Linux autostart: отклонять управляющие символы в пути | ✅ локально, без commit/push |
 | R156 | stream: закрывать stderr temp-файл при обрыве клиента | ✅ локально, без commit/push |
 | R146 | temp prompt: cleanup при ошибке UTF-8-записи | ✅ локально, без commit/push |
 | R136 | Linux installer: экранирование пути для desktop Exec | ✅ локально, без commit/push |

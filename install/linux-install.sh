@@ -5,6 +5,10 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRIDGE="$REPO/muse_bridge.py"
+if [[ "$BRIDGE" =~ [[:cntrl:]] ]]; then
+  echo "ERROR: bridge path contains a control character; cannot create a safe autostart entry." >&2
+  exit 1
+fi
 BRIDGE_EXEC="$BRIDGE"
 BRIDGE_EXEC=${BRIDGE_EXEC//\\/\\\\}
 BRIDGE_EXEC=${BRIDGE_EXEC//\"/\\\"}
