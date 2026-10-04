@@ -41,6 +41,9 @@ import threading
 import time
 from pathlib import Path
 from request_deadline import HeaderDeadlineReader as _HeaderDeadlineReader
+from request_origin import (
+    is_trusted_local_request as _is_trusted_local_request,
+)
 
 HERE = Path(__file__).resolve().parent
 
@@ -291,6 +294,7 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     failure = ""
     exit_status = None
     stop = threading.Event()
+    watch_started = False
 
     def watchdog():
         while not stop.wait(KEEPALIVE_SEC):
@@ -307,6 +311,7 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     try:
         deadline.start()
         watch.start()
+        watch_started = True
         for line in proc.stdout:
             line = line.strip()
             if not line.startswith("{"):
@@ -344,6 +349,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
         stop.set()
         if proc.poll() is None:
             proc.kill()
+        if watch_started:
+            watch.join()
         Path(prompt_path).unlink(missing_ok=True)
         try:
             exit_status = proc.wait(timeout=10)
@@ -468,6 +475,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             print(f"POST {self.path} -> 502 stream-failed", flush=True)
 
     def do_GET(self):
+        server = getattr(self, "server", None)
+        port = server.server_address[1] if server is not None else PORT
+        if not _is_trusted_local_request(self.headers, port):
+            self._json(403, {"error": {"message": "local requests only"}})
+            return
         if self.path in ("/v1/models", "/v1/models/"):
             self._json(200, {
                 "object": "list",
@@ -480,6 +492,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        server = getattr(self, "server", None)
+        port = server.server_address[1] if server is not None else PORT
+        if not _is_trusted_local_request(self.headers, port):
+            self._json(403, {"error": {"message": "local requests only"}})
+            return
         if self.path not in ("/v1/chat/completions",
                              "/v1/chat/completions/"):
             self.send_error(404)

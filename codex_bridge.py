@@ -34,6 +34,9 @@ import tempfile
 import time
 from pathlib import Path
 from request_deadline import HeaderDeadlineReader as _HeaderDeadlineReader
+from request_origin import (
+    is_trusted_local_request as _is_trusted_local_request,
+)
 
 HERE = Path(__file__).resolve().parent
 
@@ -213,6 +216,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        server = getattr(self, "server", None)
+        port = server.server_address[1] if server is not None else PORT
+        if not _is_trusted_local_request(self.headers, port):
+            self._json(403, {"error": {"message": "local requests only"}})
+            return
         if self.path in ("/v1/models", "/v1/models/"):
             self._json(200, {
                 "object": "list",
@@ -225,6 +233,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        server = getattr(self, "server", None)
+        port = server.server_address[1] if server is not None else PORT
+        if not _is_trusted_local_request(self.headers, port):
+            self._json(403, {"error": {"message": "local requests only"}})
+            return
         if self.path not in ("/v1/chat/completions",
                              "/v1/chat/completions/"):
             self.send_error(404)
