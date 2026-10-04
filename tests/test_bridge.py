@@ -377,6 +377,27 @@ class TerminalFailureTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
                 self.mb.run_muse("m", "p")
 
+    def test_terminal_failure_after_completed_text_is_reported(self):
+        completed = json.dumps({"payload_type": "run.terminal.completed",
+                                "payload": {"text": "partial answer"}})
+        failed = json.dumps({"payload_type": "run.terminal.failed",
+                             "payload": {"reason": "quota exceeded"}})
+        proc = mock.Mock(stdout=completed + "\n" + failed + "\n", stderr="")
+        with mock.patch.object(self.mb.subprocess, "run", return_value=proc):
+            with self.assertRaisesRegex(RuntimeError, "quota exceeded"):
+                self.mb.run_muse("m", "p")
+
+    def test_terminal_failure_without_reason_after_completed_text_is_reported(
+            self):
+        completed = json.dumps({"payload_type": "run.terminal.completed",
+                                "payload": {"text": "partial answer"}})
+        failed = json.dumps({"payload_type": "run.terminal.failed",
+                             "payload": {}})
+        proc = mock.Mock(stdout=completed + "\n" + failed + "\n", stderr="")
+        with mock.patch.object(self.mb.subprocess, "run", return_value=proc):
+            with self.assertRaisesRegex(RuntimeError, "muse exec failed"):
+                self.mb.run_muse("m", "p")
+
 
 class PromptTempCreationFailureTests(unittest.TestCase):
     def test_muse_removes_temp_file_when_prompt_write_fails(self):

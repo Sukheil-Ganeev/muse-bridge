@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R176 | muse: terminal failure не маскируется готовым текстом | ✅ локально, без commit/push |
 | R166 | Linux autostart: отклонять управляющие символы в пути | ✅ локально, без commit/push |
 | R156 | stream: закрывать stderr temp-файл при обрыве клиента | ✅ локально, без commit/push |
 | R146 | temp prompt: cleanup при ошибке UTF-8-записи | ✅ локально, без commit/push |
