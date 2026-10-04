@@ -122,6 +122,12 @@ class CodexBuildPromptTests(unittest.TestCase):
         }])
         self.assertEqual(prompt, "[user]\n123")
 
+    def test_null_content_is_empty_not_literal_none(self):
+        prompt = self.cb.build_prompt([
+            {"role": "assistant", "content": None}])
+        self.assertNotIn("None", prompt)
+        self.assertEqual(prompt, "[assistant]\n")
+
 
 class CodexPostValidationTests(unittest.TestCase):
     def setUp(self):

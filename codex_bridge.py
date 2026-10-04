@@ -110,6 +110,8 @@ def build_prompt(messages) -> str:
             content = " ".join(
                 str(p.get("text") if p.get("text") is not None else "")
                 for p in content if isinstance(p, dict))
+        if content is None:
+            content = ""
         parts.append(f"[{role}]\n{content}")
     return "\n\n".join(parts) or "(empty)"
 
