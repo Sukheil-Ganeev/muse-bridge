@@ -127,6 +127,22 @@ class FindMuseTests(unittest.TestCase):
                     self.mb.find_muse()
 
 
+class FindCodexTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def test_missing_explicit_override_does_not_fall_back_to_path(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing = str(Path(temp_dir) / "missing-codex")
+            with mock.patch.dict(os.environ, {"CODEX_BRIDGE_EXE": missing}), \
+                 mock.patch.object(self.cb.shutil, "which",
+                                   return_value="path-codex") as which:
+                with self.assertRaisesRegex(FileNotFoundError,
+                                            "CODEX_BRIDGE_EXE"):
+                    self.cb.find_codex()
+            which.assert_not_called()
+
+
 class CodexBuildPromptTests(unittest.TestCase):
     def setUp(self):
         self.cb = fresh_codex_bridge()
