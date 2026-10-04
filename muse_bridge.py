@@ -110,8 +110,10 @@ EFFORT_MAP = {"off": "minimal", "none": "minimal", "minimal": "minimal",
 def find_muse() -> str:
     """Locate the muse CLI on this machine, cross-platform."""
     override = os.environ.get("MUSE_BRIDGE_EXE")
-    if override and Path(override).exists():
-        return override
+    if override:
+        if Path(override).exists():
+            return override
+        raise FileNotFoundError("MUSE_BRIDGE_EXE points to a missing path")
     exe = shutil.which("muse")
     if exe:
         return exe
