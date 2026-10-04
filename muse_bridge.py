@@ -183,11 +183,12 @@ def _content_length_header(headers):
 
 
 def run_muse(model: str, prompt: str, effort: str = "high") -> str:
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
-                                     encoding="utf-8") as pf:
-        pf.write(prompt)
-        prompt_path = pf.name
+    prompt_path = None
     try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                         encoding="utf-8") as pf:
+            prompt_path = pf.name
+            pf.write(prompt)
         proc = subprocess.run(
             _muse_command(["exec", "--json", "--model", model,
                            "--reasoning-effort", effort] + TAME_FLAGS +
@@ -195,7 +196,8 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
             capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=EXEC_TIMEOUT)
     finally:
-        Path(prompt_path).unlink(missing_ok=True)
+        if prompt_path is not None:
+            Path(prompt_path).unlink(missing_ok=True)
     text = ""
     failure = ""
     for line in (proc.stdout or "").splitlines():
@@ -227,14 +229,15 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     on_delta is also called with None every KEEPALIVE_SEC of silence so the
     HTTP client sees a live stream on long agent runs. Returns the full text.
     """
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
-                                     encoding="utf-8") as pf:
-        pf.write(prompt)
-        prompt_path = pf.name
+    prompt_path = None
     # stderr goes to a temp file (not a pipe) so a chatty muse cannot block
     # the child by filling the pipe buffer while we only read stdout.
     err_fp = None
     try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
+                                         encoding="utf-8") as pf:
+            prompt_path = pf.name
+            pf.write(prompt)
         err_fp = tempfile.TemporaryFile("w+", encoding="utf-8",
                                         errors="replace")
         proc = subprocess.Popen(
@@ -245,7 +248,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             text=True, encoding="utf-8", errors="replace",
             bufsize=1)
     except BaseException:
-        Path(prompt_path).unlink(missing_ok=True)
+        if prompt_path is not None:
+            Path(prompt_path).unlink(missing_ok=True)
         if err_fp is not None:
             err_fp.close()
         raise
@@ -316,6 +320,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
         except Exception:
             exit_status = proc.poll()
         deadline.cancel()
+        if sys.exc_info()[0] is not None:
+            err_fp.close()
     try:
         if failure or exit_status != 0 or not "".join(full):
             try:

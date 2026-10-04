@@ -2,6 +2,8 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R156 | stream: закрывать stderr temp-файл при обрыве клиента | ✅ локально, без commit/push |
+| R146 | temp prompt: cleanup при ошибке UTF-8-записи | ✅ локально, без commit/push |
 | R136 | Linux installer: экранирование пути для desktop Exec | ✅ локально, без commit/push |
 | R126 | stream: останавливать CLI после разрыва SSE-клиента | ✅ локально, без commit/push |
 | R116 | macOS installer: XML-экранирование пути в LaunchAgent plist | ✅ локально, без commit/push |
