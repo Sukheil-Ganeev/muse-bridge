@@ -43,6 +43,35 @@ class MacOSInstallTests(unittest.TestCase):
 
 
 class LinuxInstallTests(unittest.TestCase):
+    def test_autostart_rejects_control_character_in_repo_path(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            project = temp / "project\nmalicious"
+            install_dir = project / "install"
+            install_dir.mkdir(parents=True)
+            shutil.copyfile(ROOT / "install" / "linux-install.sh",
+                            install_dir / "linux-install.sh")
+
+            fake_bin = temp / "bin"
+            fake_bin.mkdir()
+            python = fake_bin / "python3"
+            python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            python.chmod(0o755)
+
+            home = temp / "home"
+            home.mkdir()
+            env = os.environ.copy()
+            env["HOME"] = str(home)
+            env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+            result = subprocess.run(
+                ["bash", str(install_dir / "linux-install.sh")],
+                capture_output=True, text=True, env=env)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("control character", result.stderr + result.stdout)
+            desktop = home / ".config" / "autostart" / "muse-bridge.desktop"
+            self.assertFalse(desktop.exists())
+
     def test_autostart_exec_preserves_quotes_and_backslashes_in_repo_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
