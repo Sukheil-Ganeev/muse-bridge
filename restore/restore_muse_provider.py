@@ -20,9 +20,18 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+def _no_duplicate_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate key in JSON object: {key}")
+        result[key] = value
+    return result
+
+
 def load(name):
     with open(os.path.join(HERE, name), encoding="utf-8") as f:
-        return json.load(f)
+        return json.load(f, object_pairs_hook=_no_duplicate_object)
 
 
 def main():
