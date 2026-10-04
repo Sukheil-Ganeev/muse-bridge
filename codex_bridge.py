@@ -77,8 +77,10 @@ MODELS = [
 
 def find_codex() -> str:
     override = os.environ.get("CODEX_BRIDGE_EXE")
-    if override and Path(override).exists():
-        return override
+    if override:
+        if Path(override).exists():
+            return override
+        raise FileNotFoundError("CODEX_BRIDGE_EXE points to a missing path")
     exe = shutil.which("codex")
     if exe:
         return exe
