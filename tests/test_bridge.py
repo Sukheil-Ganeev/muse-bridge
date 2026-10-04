@@ -11,6 +11,7 @@ import tempfile
 import threading
 import unittest
 import urllib.request
+from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -109,6 +110,21 @@ class ModelListTests(unittest.TestCase):
     def test_empty_env_falls_back_to_defaults(self):
         mb = fresh_bridge(" , ,")
         self.assertEqual(mb.MODELS, mb.DEFAULT_MODELS)
+
+
+class FindMuseTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def test_missing_explicit_override_does_not_fall_back_to_path(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing = str(Path(temp_dir) / "missing-muse")
+            with mock.patch.dict(os.environ, {"MUSE_BRIDGE_EXE": missing}), \
+                 mock.patch.object(self.mb.shutil, "which",
+                                   return_value="path-muse"):
+                with self.assertRaisesRegex(FileNotFoundError,
+                                            "MUSE_BRIDGE_EXE"):
+                    self.mb.find_muse()
 
 
 class CodexBuildPromptTests(unittest.TestCase):
