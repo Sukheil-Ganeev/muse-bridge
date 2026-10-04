@@ -700,6 +700,71 @@ class StreamAbortTests(unittest.TestCase):
         self.assertTrue(recorded["err_fp"].closed)
 
 
+class StreamKeepaliveAbortTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def test_keepalive_write_failure_kills_cli_while_stdout_waits(self):
+        stdout_waiting = threading.Event()
+        release_stdout = threading.Event()
+        killed = threading.Event()
+
+        class BlockingStdout:
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                stdout_waiting.set()
+                release_stdout.wait(timeout=2)
+                raise StopIteration
+
+        class FakeProc:
+            stdout = BlockingStdout()
+
+            def poll(self):
+                return -9 if killed.is_set() else None
+
+            def kill(self):
+                killed.set()
+                release_stdout.set()
+
+            def wait(self, timeout=None):
+                return -9
+
+        proc = FakeProc()
+        failures = []
+
+        def broken_keepalive(piece):
+            if piece is None:
+                raise BrokenPipeError("client gone")
+
+        def run_stream():
+            try:
+                self.mb.stream_muse("m", "p", "high", broken_keepalive)
+            except Exception as exc:
+                failures.append(exc)
+
+        worker = threading.Thread(target=run_stream, daemon=True)
+        with mock.patch.object(self.mb.subprocess, "Popen", return_value=proc), \
+             mock.patch.object(self.mb, "KEEPALIVE_SEC", 0.01):
+            worker.start()
+
+            def cleanup():
+                release_stdout.set()
+                worker.join(timeout=2)
+
+            self.addCleanup(cleanup)
+            self.assertTrue(stdout_waiting.wait(timeout=1))
+            self.assertTrue(
+                killed.wait(timeout=0.5),
+                "CLI kept running after the keepalive write failed")
+            worker.join(timeout=1)
+
+        self.assertFalse(worker.is_alive())
+        self.assertTrue(failures)
+        self.assertIsInstance(failures[0], RuntimeError)
+
+
 class HealthTests(unittest.TestCase):
     def test_health_and_models(self):
         mb = fresh_bridge("a,b")

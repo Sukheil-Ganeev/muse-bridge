@@ -2,6 +2,8 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R136 | Linux installer: экранирование пути для desktop Exec | ✅ локально, без commit/push |
+| R126 | stream: останавливать CLI после разрыва SSE-клиента | ✅ локально, без commit/push |
 | R116 | macOS installer: XML-экранирование пути в LaunchAgent plist | ✅ локально, без commit/push |
 | R106 | stream: ненулевой код выхода CLI не маскируется частичным текстом | ✅ локально, без commit/push |
 | R096 | stream: ошибка terminal.failed не теряется после частичного текста | ✅ локально, без commit/push |

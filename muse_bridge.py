@@ -263,6 +263,10 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             try:
                 on_delta(None)
             except Exception:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
                 break
 
     watch = threading.Thread(target=watchdog, daemon=True)

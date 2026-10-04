@@ -5,6 +5,13 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRIDGE="$REPO/muse_bridge.py"
+BRIDGE_EXEC="$BRIDGE"
+BRIDGE_EXEC=${BRIDGE_EXEC//\\/\\\\}
+BRIDGE_EXEC=${BRIDGE_EXEC//\"/\\\"}
+BRIDGE_EXEC=${BRIDGE_EXEC//\`/\\\`}
+BRIDGE_EXEC=${BRIDGE_EXEC//\$/\\\$}
+BRIDGE_EXEC=${BRIDGE_EXEC//%/%%}
+BRIDGE_EXEC_VALUE=${BRIDGE_EXEC//\\/\\\\}
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 not found. Install it first (e.g. apt install python3)."
@@ -19,7 +26,7 @@ cat > "$DESKTOP" <<EOF
 Type=Application
 Name=Muse Bridge
 Comment=Muse subscription bridge (OpenAI-compatible local API)
-Exec=/usr/bin/env python3 "$BRIDGE"
+Exec=/usr/bin/env python3 "$BRIDGE_EXEC_VALUE"
 X-GNOME-Autostart-enabled=true
 EOF
 echo "OK: autostart created: $DESKTOP"
