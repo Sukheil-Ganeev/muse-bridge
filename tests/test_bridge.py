@@ -723,6 +723,82 @@ class StreamAbortTests(unittest.TestCase):
 
         self.assertTrue(recorded["stderr"].closed)
 
+    def test_timer_start_failure_kills_exec_and_cleans_temp_files(self):
+        proc = _FakeProc([])
+        recorded = self._patched(proc)
+        recorded_stderr = {}
+        real_tempfile = self.mb.tempfile.TemporaryFile
+
+        def spy_tempfile(*args, **kwargs):
+            fp = real_tempfile(*args, **kwargs)
+            recorded_stderr["fp"] = fp
+            return fp
+
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(self.mb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.mb.tempfile, "TemporaryFile",
+                                   side_effect=spy_tempfile), \
+                 mock.patch.object(self.mb.threading.Timer, "start",
+                                   side_effect=RuntimeError("no timer thread")):
+                with self.assertRaisesRegex(RuntimeError, "no timer thread"):
+                    self.mb.stream_muse("m", "p", "high", lambda _: None)
+
+        self.assertTrue(proc.killed)
+        self.assertTrue(proc.wait_calls)
+        self.assertFalse(os.path.exists(recorded["path"]))
+        self.assertTrue(recorded_stderr["fp"].closed)
+
+    def test_keepalive_start_failure_kills_exec_and_cleans_temp_files(self):
+        proc = _FakeProc([])
+        recorded = self._patched(proc)
+        recorded_stderr = {}
+        timers = []
+        real_tempfile = self.mb.tempfile.TemporaryFile
+
+        class TimerStub:
+            def __init__(self):
+                self.cancelled = False
+
+            def start(self):
+                pass
+
+            def cancel(self):
+                self.cancelled = True
+
+        def fake_timer(*_args, **_kwargs):
+            timer = TimerStub()
+            timers.append(timer)
+            return timer
+
+        def spy_tempfile(*args, **kwargs):
+            fp = real_tempfile(*args, **kwargs)
+            recorded_stderr["fp"] = fp
+            return fp
+
+        watch = mock.Mock()
+        watch.start.side_effect = RuntimeError("no keepalive thread")
+        with tempfile.TemporaryDirectory(dir=os.path.dirname(
+                os.path.dirname(os.path.abspath(__file__)))) as temp_dir:
+            with mock.patch.object(self.mb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.mb.tempfile, "TemporaryFile",
+                                   side_effect=spy_tempfile), \
+                 mock.patch.object(self.mb.threading, "Timer",
+                                   side_effect=fake_timer), \
+                 mock.patch.object(self.mb.threading, "Thread",
+                                   return_value=watch):
+                with self.assertRaisesRegex(RuntimeError,
+                                            "no keepalive thread"):
+                    self.mb.stream_muse("m", "p", "high", lambda _: None)
+
+        self.assertTrue(proc.killed)
+        self.assertTrue(proc.wait_calls)
+        self.assertTrue(timers[0].cancelled)
+        self.assertFalse(os.path.exists(recorded["path"]))
+        self.assertTrue(recorded_stderr["fp"].closed)
+
     def test_clean_stream_returns_text_without_kill(self):
         proc = _FakeProc([_delta("he"), _delta("llo")])
         recorded = self._patched(proc)

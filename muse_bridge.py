@@ -258,7 +258,6 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
     print(f"exec spawned model={model} effort={effort}", flush=True)
     deadline = threading.Timer(EXEC_TIMEOUT, proc.kill)
     deadline.daemon = True
-    deadline.start()
     full = []
     failure = ""
     exit_status = None
@@ -276,8 +275,9 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 break
 
     watch = threading.Thread(target=watchdog, daemon=True)
-    watch.start()
     try:
+        deadline.start()
+        watch.start()
         for line in proc.stdout:
             line = line.strip()
             if not line.startswith("{"):
@@ -308,10 +308,10 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 failure = str(reason)[:200] if reason else "unknown reason"
                 print(f"exec terminal-failed: {failure}", flush=True)
     finally:
-        # Every exit path — client abort, parse errors, terminal failure,
-        # deadline kill — lands here: stop the watchdog, cancel a still-
-        # running exec instead of waiting EXEC_TIMEOUT for it, reap it,
-        # and drop the prompt file.
+        # Every exit path — client abort, supervision startup failure, parse
+        # errors, terminal failure, deadline kill — lands here: stop the
+        # watchdog, cancel a still-running exec instead of waiting
+        # EXEC_TIMEOUT for it, reap it, and drop the prompt file.
         stop.set()
         if proc.poll() is None:
             proc.kill()
