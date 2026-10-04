@@ -751,6 +751,15 @@ class StreamAbortTests(unittest.TestCase):
             self.mb.stream_muse("m", "p", "high", lambda _: None)
         self.assertFalse(os.path.exists(recorded["path"]))
 
+    def test_terminal_failure_without_reason_after_partial_output_is_reported(self):
+        event = json.dumps({"payload_type": "run.terminal.failed",
+                            "payload": {}})
+        proc = _FakeProc([_delta("partial"), event])
+        recorded = self._patched(proc)
+        with self.assertRaisesRegex(RuntimeError, "unknown reason"):
+            self.mb.stream_muse("m", "p", "high", lambda _: None)
+        self.assertFalse(os.path.exists(recorded["path"]))
+
     def test_nonzero_process_exit_after_partial_output_is_reported(self):
         proc = _FakeProc([_delta("partial")], returncode=17)
         recorded = self._patched(proc)
