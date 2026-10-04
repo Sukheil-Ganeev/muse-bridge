@@ -200,6 +200,145 @@ class CodexContentLengthTests(unittest.TestCase):
         self.assertEqual(resp["status"], 413)
 
 
+class RequestOriginProtectionTests(unittest.TestCase):
+    def _post(self, module, runner_name, headers):
+        payload = {"messages": [{"role": "user", "content": "hi"}]}
+        body = json.dumps(payload).encode()
+        response = {}
+        request_headers = {"Content-Length": str(len(body)), **headers}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = request_headers
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(
+                module, runner_name, return_value="ok") as runner:
+            module.Handler.do_POST(handler)
+        return response, runner
+
+    def _get(self, module, headers):
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/health"
+        handler.headers = headers
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        module.Handler.do_GET(handler)
+        return response
+
+    def _assert_foreign_origin_is_rejected(self, module, runner_name):
+        response, runner = self._post(module, runner_name, {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Origin": "https://attacker.example",
+            "Content-Type": "text/plain",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_muse_rejects_cross_site_simple_post(self):
+        self._assert_foreign_origin_is_rejected(
+            fresh_bridge(), "run_muse")
+
+    def test_codex_rejects_cross_site_simple_post(self):
+        self._assert_foreign_origin_is_rejected(
+            fresh_codex_bridge(), "run_codex")
+
+    def test_muse_rejects_foreign_host_without_origin(self):
+        module = fresh_bridge()
+        response, runner = self._post(module, "run_muse", {
+            "Host": f"attacker.example:{module.PORT}",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_codex_rejects_foreign_host_without_origin(self):
+        module = fresh_codex_bridge()
+        response, runner = self._post(module, "run_codex", {
+            "Host": f"attacker.example:{module.PORT}",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_muse_rejects_loopback_host_with_wrong_port(self):
+        module = fresh_bridge()
+        wrong_port = (module.PORT + 1 if module.PORT < 65535
+                      else module.PORT - 1)
+        response, runner = self._post(module, "run_muse", {
+            "Host": f"localhost:{wrong_port}",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_codex_rejects_local_origin_with_wrong_port(self):
+        module = fresh_codex_bridge()
+        wrong_port = (module.PORT + 1 if module.PORT < 65535
+                      else module.PORT - 1)
+        response, runner = self._post(module, "run_codex", {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Origin": f"http://localhost:{wrong_port}",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_muse_rejects_malformed_host_port(self):
+        module = fresh_bridge()
+        response, runner = self._post(module, "run_muse", {
+            "Host": "localhost:not-a-port",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_codex_rejects_malformed_origin_port(self):
+        module = fresh_codex_bridge()
+        response, runner = self._post(module, "run_codex", {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Origin": "http://localhost:not-a-port",
+        })
+        self.assertEqual(response["status"], 403)
+        runner.assert_not_called()
+
+    def test_muse_rejects_cross_site_health_request(self):
+        module = fresh_bridge()
+        response = self._get(module, {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Origin": "https://attacker.example",
+        })
+        self.assertEqual(response["status"], 403)
+
+    def test_codex_rejects_foreign_host_on_health_request(self):
+        module = fresh_codex_bridge()
+        response = self._get(module, {
+            "Host": f"attacker.example:{module.PORT}",
+        })
+        self.assertEqual(response["status"], 403)
+
+    def test_same_local_origin_remains_supported(self):
+        module = fresh_codex_bridge()
+        port = module.PORT
+        response = self._get(module, {
+            "Host": f"localhost:{port}",
+            "Origin": f"http://127.0.0.1:{port}",
+        })
+        self.assertEqual(response["status"], 200)
+
+    def test_local_request_without_origin_remains_supported(self):
+        module = fresh_bridge()
+        response, runner = self._post(module, "run_muse", {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Content-Type": "application/json",
+        })
+        self.assertEqual(response["status"], 200)
+        runner.assert_called_once()
+
+    def test_local_host_without_port_remains_supported(self):
+        response, runner = self._post(fresh_codex_bridge(), "run_codex", {
+            "Host": "localhost",
+        })
+        self.assertEqual(response["status"], 200)
+        runner.assert_called_once()
+
+
 class RequestHeaderTimeoutTests(unittest.TestCase):
     class FakeSocket:
         def __init__(self):
@@ -1189,6 +1328,85 @@ class StreamKeepaliveAbortTests(unittest.TestCase):
         self.assertFalse(worker.is_alive())
         self.assertTrue(failures)
         self.assertIsInstance(failures[0], RuntimeError)
+
+
+class StreamKeepaliveCompletionTests(unittest.TestCase):
+    def setUp(self):
+        self.mb = fresh_bridge()
+
+    def test_stream_waits_for_inflight_keepalive_before_return(self):
+        ping_started = threading.Event()
+        release_ping = threading.Event()
+        finished = threading.Event()
+        results = []
+        failures = []
+
+        class BlockingStdout:
+            def __init__(self):
+                self.sent_result = False
+                self.exhausted = False
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if not self.sent_result:
+                    self.sent_result = True
+                    return json.dumps({
+                        "payload_type": "run.terminal.completed",
+                        "payload": {"text": "complete"},
+                    })
+                self.exhausted = True
+                if not ping_started.wait(timeout=2):
+                    raise AssertionError("keepalive callback did not start")
+                raise StopIteration
+
+        class FakeProc:
+            def __init__(self):
+                self.stdout = BlockingStdout()
+
+            def poll(self):
+                return 0 if self.stdout.exhausted else None
+
+            def kill(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
+        proc = FakeProc()
+
+        def on_delta(piece):
+            if piece is None:
+                ping_started.set()
+                release_ping.wait(timeout=2)
+
+        def run_stream():
+            try:
+                results.append(self.mb.stream_muse(
+                    "m", "p", "high", on_delta))
+            except Exception as exc:
+                failures.append(exc)
+            finally:
+                finished.set()
+
+        worker = threading.Thread(target=run_stream, daemon=True)
+        with mock.patch.object(self.mb.subprocess, "Popen",
+                               return_value=proc), \
+             mock.patch.object(self.mb, "KEEPALIVE_SEC", 0.01):
+            worker.start()
+            try:
+                self.assertTrue(ping_started.wait(timeout=1))
+                self.assertFalse(
+                    finished.wait(timeout=0.05),
+                    "stream returned while its keepalive callback was active")
+            finally:
+                release_ping.set()
+                worker.join(timeout=2)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(results, ["complete"])
+        self.assertEqual(failures, [])
 
 
 class HealthTests(unittest.TestCase):
