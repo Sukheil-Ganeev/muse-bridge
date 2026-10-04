@@ -40,6 +40,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from request_deadline import HeaderDeadlineReader as _HeaderDeadlineReader
 
 HERE = Path(__file__).resolve().parent
 
@@ -61,6 +62,7 @@ KEEPALIVE_SEC = 15
 MAX_BODY_BYTES = 4 * 1024 * 1024
 POST_BODY_READ_TIMEOUT = 30
 REQUEST_IDLE_TIMEOUT = 30
+REQUEST_HEADER_READ_TIMEOUT = 30
 
 
 def _no_duplicate_object(pairs):
@@ -373,6 +375,27 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "MuseBridge/1.0"
     timeout = REQUEST_IDLE_TIMEOUT
+
+    def handle_one_request(self):
+        reader = self.rfile
+        self.rfile = _HeaderDeadlineReader(
+            reader, self.connection, REQUEST_HEADER_READ_TIMEOUT)
+        try:
+            super().handle_one_request()
+        finally:
+            self.rfile = reader
+            self.connection.settimeout(self.timeout)
+
+    def parse_request(self):
+        try:
+            return super().parse_request()
+        except (socket.timeout, TimeoutError):
+            self.close_connection = True
+            self.connection.settimeout(self.timeout)
+            self.send_error(408, "Request Timeout")
+            return False
+        finally:
+            self.connection.settimeout(self.timeout)
 
     def log_message(self, fmt, *args):
         pass
