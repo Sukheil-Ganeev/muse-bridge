@@ -5,6 +5,10 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRIDGE="$REPO/muse_bridge.py"
+if [[ "$BRIDGE" =~ [[:cntrl:]] ]]; then
+  echo "ERROR: bridge path contains a control character; cannot create a safe LaunchAgent plist." >&2
+  exit 1
+fi
 BRIDGE_XML="$BRIDGE"
 BRIDGE_XML=${BRIDGE_XML//&/\&amp;}
 BRIDGE_XML=${BRIDGE_XML//</\&lt;}

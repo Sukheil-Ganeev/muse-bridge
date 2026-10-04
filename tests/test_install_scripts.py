@@ -12,6 +12,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MacOSInstallTests(unittest.TestCase):
+    def test_plist_rejects_control_character_in_repo_path(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            project = temp / "project\x01bad"
+            install_dir = project / "install"
+            install_dir.mkdir(parents=True)
+            shutil.copyfile(ROOT / "install" / "macos-install.sh",
+                            install_dir / "macos-install.sh")
+
+            fake_bin = temp / "bin"
+            fake_bin.mkdir()
+            launchctl = fake_bin / "launchctl"
+            launchctl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            launchctl.chmod(0o755)
+
+            home = temp / "home"
+            home.mkdir()
+            env = os.environ.copy()
+            env["HOME"] = str(home)
+            env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+            result = subprocess.run(
+                ["bash", str(install_dir / "macos-install.sh")],
+                capture_output=True, text=True, env=env)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("control character", result.stderr + result.stdout)
+            plist_path = home / "Library" / "LaunchAgents" / "com.muse-bridge.plist"
+            self.assertFalse(plist_path.exists())
+
     def test_plist_escapes_xml_special_characters_in_repo_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

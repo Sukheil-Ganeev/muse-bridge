@@ -305,9 +305,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             elif pt == "run.terminal.failed":
                 payload = ev.get("payload")
                 reason = payload.get("reason") if isinstance(payload, dict) else None
-                if reason:
-                    failure = str(reason)[:200]
-                    print(f"exec terminal-failed: {failure}", flush=True)
+                failure = str(reason)[:200] if reason else "unknown reason"
+                print(f"exec terminal-failed: {failure}", flush=True)
     finally:
         # Every exit path — client abort, parse errors, terminal failure,
         # deadline kill — lands here: stop the watchdog, cancel a still-
