@@ -200,6 +200,70 @@ class CodexContentLengthTests(unittest.TestCase):
         self.assertEqual(resp["status"], 413)
 
 
+class RequestExpectationTests(unittest.TestCase):
+    def _post(self, module, runner_name, expectation):
+        body = json.dumps({
+            "messages": [{"role": "user", "content": "hi"}]}).encode()
+        response = {}
+        writer = io.BytesIO()
+        body_read_after = []
+
+        class BodyReader(io.BytesIO):
+            def read(self, size=-1):
+                body_read_after.append(writer.getvalue())
+                return super().read(size)
+
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.request_version = "HTTP/1.1"
+        handler.headers = {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Content-Length": str(len(body)),
+            "Expect": expectation,
+        }
+        handler.rfile = BodyReader(body)
+        handler.wfile = writer
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+
+        with mock.patch.object(
+                module, runner_name, return_value="ok") as runner:
+            module.Handler.do_POST(handler)
+        return response, runner, body_read_after, writer
+
+    def _assert_100_continue_precedes_body_read(self, module, runner_name):
+        response, runner, body_read_after, writer = self._post(
+            module, runner_name, "100-continue")
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(body_read_after,
+                         [b"HTTP/1.1 100 Continue\r\n\r\n"])
+        self.assertEqual(writer.getvalue(), b"HTTP/1.1 100 Continue\r\n\r\n")
+        runner.assert_called_once()
+
+    def test_muse_sends_100_continue_before_reading_body(self):
+        self._assert_100_continue_precedes_body_read(
+            fresh_bridge(), "run_muse")
+
+    def test_codex_sends_100_continue_before_reading_body(self):
+        self._assert_100_continue_precedes_body_read(
+            fresh_codex_bridge(), "run_codex")
+
+    def _assert_unknown_expectation_is_rejected(self, module, runner_name):
+        response, runner, body_read_after, _ = self._post(
+            module, runner_name, "something-else")
+        self.assertEqual(response["status"], 417)
+        self.assertEqual(body_read_after, [])
+        runner.assert_not_called()
+
+    def test_muse_rejects_unknown_expectation_without_reading_body(self):
+        self._assert_unknown_expectation_is_rejected(
+            fresh_bridge(), "run_muse")
+
+    def test_codex_rejects_unknown_expectation_without_reading_body(self):
+        self._assert_unknown_expectation_is_rejected(
+            fresh_codex_bridge(), "run_codex")
+
+
 class RequestOriginProtectionTests(unittest.TestCase):
     def _post(self, module, runner_name, headers):
         payload = {"messages": [{"role": "user", "content": "hi"}]}
