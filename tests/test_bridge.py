@@ -200,6 +200,121 @@ class CodexContentLengthTests(unittest.TestCase):
         self.assertEqual(resp["status"], 413)
 
 
+class RequestHeaderTimeoutTests(unittest.TestCase):
+    class FakeSocket:
+        def __init__(self):
+            self.timeouts = []
+
+        def settimeout(self, value):
+            self.timeouts.append(value)
+
+        def makefile(self, _mode, _buffering=None):
+            return io.BytesIO()
+
+    def _assert_handler_setup_sets_idle_timeout(self, module):
+        connection = self.FakeSocket()
+        handler = module.Handler.__new__(module.Handler)
+        handler.request = connection
+        handler.client_address = ("127.0.0.1", 0)
+        handler.server = None
+        handler.setup()
+        self.assertEqual(connection.timeouts, [30])
+
+    def test_muse_limits_idle_request_line_and_header_reads(self):
+        self._assert_handler_setup_sets_idle_timeout(fresh_bridge())
+
+    def test_codex_limits_idle_request_line_and_header_reads(self):
+        self._assert_handler_setup_sets_idle_timeout(fresh_codex_bridge())
+
+
+class PostBodyDeadlineTests(unittest.TestCase):
+    class FakeConnection:
+        def __init__(self, timeout=7):
+            self.original_timeout = timeout
+            self.timeouts = []
+
+        def gettimeout(self):
+            return self.original_timeout
+
+        def settimeout(self, value):
+            self.timeouts.append(value)
+
+    def _assert_partial_body_times_out(self, module):
+        response = {}
+
+        class SlowBody:
+            def read(self, _length):
+                raise TimeoutError("body read deadline")
+
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": "10"}
+        handler.rfile = SlowBody()
+        handler.connection = self.FakeConnection(timeout=None)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(module, "POST_BODY_READ_TIMEOUT", 0.05,
+                                create=True):
+            module.Handler.do_POST(handler)
+
+        self.assertEqual(response["status"], 408)
+        self.assertTrue(handler.connection.timeouts)
+        self.assertIsNone(handler.connection.timeouts[-1])
+
+    def _assert_complete_body_is_read(self, module):
+        body = b'{"messages": []}'
+        connection = self.FakeConnection()
+        with mock.patch.object(module, "POST_BODY_READ_TIMEOUT", 0.05,
+                                create=True):
+            actual = module._read_request_body(
+                io.BytesIO(body), connection, len(body))
+        self.assertEqual(actual, body)
+        self.assertEqual(connection.timeouts[-1], 7)
+        self.assertGreater(connection.timeouts[0], 0)
+        self.assertLessEqual(connection.timeouts[0], 0.05)
+
+    def _assert_deadline_is_total_not_per_chunk(self, module):
+        class OneByteReader:
+            def __init__(self):
+                self.calls = 0
+
+            def read1(self, _length):
+                self.calls += 1
+                return b"x"
+
+            def read(self, _length):
+                return self.read1(_length)
+
+        reader = OneByteReader()
+        connection = self.FakeConnection(timeout=None)
+        with mock.patch.object(module, "POST_BODY_READ_TIMEOUT", 0.05,
+                                create=True), \
+             mock.patch.object(module.time, "monotonic",
+                               side_effect=[10.0, 10.02, 10.06]):
+            with self.assertRaises(TimeoutError):
+                module._read_request_body(reader, connection, 2)
+        self.assertEqual(reader.calls, 1)
+        self.assertIsNone(connection.timeouts[-1])
+
+    def test_muse_rejects_a_body_that_exceeds_its_read_deadline(self):
+        self._assert_partial_body_times_out(fresh_bridge())
+
+    def test_codex_rejects_a_body_that_exceeds_its_read_deadline(self):
+        self._assert_partial_body_times_out(fresh_codex_bridge())
+
+    def test_muse_reads_complete_body_and_restores_timeout(self):
+        self._assert_complete_body_is_read(fresh_bridge())
+
+    def test_codex_reads_complete_body_and_restores_timeout(self):
+        self._assert_complete_body_is_read(fresh_codex_bridge())
+
+    def test_muse_uses_one_deadline_for_all_body_chunks(self):
+        self._assert_deadline_is_total_not_per_chunk(fresh_bridge())
+
+    def test_codex_uses_one_deadline_for_all_body_chunks(self):
+        self._assert_deadline_is_total_not_per_chunk(fresh_codex_bridge())
+
+
 class MusePostValidationTests(unittest.TestCase):
     def setUp(self):
         self.mb = fresh_bridge()

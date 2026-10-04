@@ -27,9 +27,11 @@ import http.server
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -49,6 +51,8 @@ def _env_int(name: str, fallback: int) -> int:
 PORT = _env_int("CODEX_BRIDGE_PORT", 11472)
 EXEC_TIMEOUT = 280
 MAX_BODY_BYTES = 4 * 1024 * 1024
+POST_BODY_READ_TIMEOUT = 30
+REQUEST_IDLE_TIMEOUT = 30
 
 
 def _no_duplicate_object(pairs):
@@ -101,6 +105,30 @@ def _content_length_header(headers):
     return values[0] if values else headers.get("Content-Length")
 
 
+def _read_request_body(reader, connection, length):
+    if connection is None:
+        return reader.read(length)
+    previous_timeout = connection.gettimeout()
+    deadline = time.monotonic() + POST_BODY_READ_TIMEOUT
+    chunks = []
+    remaining = length
+    read_chunk = getattr(reader, "read1", reader.read)
+    try:
+        while remaining:
+            timeout = deadline - time.monotonic()
+            if timeout <= 0:
+                raise socket.timeout("request body read timed out")
+            connection.settimeout(timeout)
+            chunk = read_chunk(min(remaining, 65536))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b"".join(chunks)
+    finally:
+        connection.settimeout(previous_timeout)
+
+
 def build_prompt(messages) -> str:
     parts = []
     for m in messages or []:
@@ -148,6 +176,7 @@ def run_codex(model: str, prompt: str) -> str:
 
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "CodexBridge/1.0"
+    timeout = REQUEST_IDLE_TIMEOUT
 
     def log_message(self, fmt, *args):
         pass
@@ -191,13 +220,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(413, {"error": {"message": "payload too large"}})
             return
         try:
-            body = self.rfile.read(length)
+            body = _read_request_body(
+                self.rfile, getattr(self, "connection", None), length)
             if len(body) != length:
                 self._json(400, {
                     "error": {"message": "incomplete request body"}})
                 return
             payload = json.loads(
                 body or b"{}", object_pairs_hook=_no_duplicate_object)
+        except (socket.timeout, TimeoutError):
+            self._json(408, {
+                "error": {"message": "request body read timed out"}})
+            return
         except Exception:
             self._json(400, {"error": {"message": "bad json"}})
             return
