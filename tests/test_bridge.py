@@ -435,6 +435,71 @@ class RequestOriginProtectionTests(unittest.TestCase):
         runner.assert_called_once()
 
 
+class EarlyRejectConnectionTests(unittest.TestCase):
+    def _post(self, module, runner_name, headers, body):
+        response = {}
+        request_headers = Message()
+        for name, value in headers.items():
+            request_headers.add_header(name, value)
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = request_headers
+        handler.rfile = io.BytesIO(body)
+        handler.close_connection = False
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(module, runner_name, return_value="ok") as runner:
+            module.Handler.do_POST(handler)
+        return response, handler, runner
+
+    def _assert_rejected_body_closes_connection(self, module, runner_name):
+        body = (b'POST /v1/chat/completions HTTP/1.1\r\n'
+                b'Host: 127.0.0.1\r\nContent-Length: 14\r\n\r\n'
+                b'{"messages":[]}')
+        response, handler, runner = self._post(module, runner_name, {
+            "Host": f"127.0.0.1:{module.PORT}",
+            "Origin": "https://attacker.example",
+            "Content-Length": str(len(body)),
+        }, body)
+        self.assertEqual(response["status"], 403)
+        self.assertEqual(handler.rfile.tell(), 0)
+        self.assertTrue(handler.close_connection)
+        runner.assert_not_called()
+
+    def test_muse_closes_after_rejecting_unread_cross_site_body(self):
+        self._assert_rejected_body_closes_connection(
+            fresh_bridge(), "run_muse")
+
+    def test_codex_closes_after_rejecting_unread_cross_site_body(self):
+        self._assert_rejected_body_closes_connection(
+            fresh_codex_bridge(), "run_codex")
+
+    def test_partial_body_rejection_closes_connection_in_both_bridges(self):
+        body = b'{"messages":[]}'
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            response, handler, runner = self._post(module, runner_name, {
+                "Host": f"127.0.0.1:{module.PORT}",
+                "Content-Length": str(len(body) + 1),
+            }, body)
+            self.assertEqual(response["status"], 400)
+            self.assertTrue(handler.close_connection)
+            runner.assert_not_called()
+
+    def test_unknown_get_route_closes_connection_in_both_bridges(self):
+        for module in (fresh_bridge(), fresh_codex_bridge()):
+            response = {}
+            handler = type("HandlerStub", (), {})()
+            handler.path = "/unknown"
+            handler.headers = {"Host": f"127.0.0.1:{module.PORT}"}
+            handler.close_connection = False
+            handler.send_error = lambda status: response.update(status=status)
+            module.Handler.do_GET(handler)
+            self.assertEqual(response["status"], 404)
+            self.assertTrue(handler.close_connection)
+
+
 class RequestHeaderTimeoutTests(unittest.TestCase):
     class FakeSocket:
         def __init__(self):

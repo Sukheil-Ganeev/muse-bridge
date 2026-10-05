@@ -216,6 +216,11 @@ def _read_request_body(reader, connection, length):
         connection.settimeout(previous_timeout)
 
 
+def _reject_before_body(handler, status: int, obj) -> None:
+    handler.close_connection = True
+    handler._json(status, obj)
+
+
 def run_muse(model: str, prompt: str, effort: str = "high") -> str:
     prompt_path = None
     try:
@@ -480,7 +485,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         server = getattr(self, "server", None)
         port = server.server_address[1] if server is not None else PORT
         if not _is_trusted_local_request(self.headers, port):
-            self._json(403, {"error": {"message": "local requests only"}})
+            _reject_before_body(
+                self, 403, {"error": {"message": "local requests only"}})
             return
         if self.path in ("/v1/models", "/v1/models/"):
             self._json(200, {
@@ -491,30 +497,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path in ("/", "/health"):
             self._json(200, {"ok": True})
         else:
+            self.close_connection = True
             self.send_error(404)
 
     def do_POST(self):
         server = getattr(self, "server", None)
         port = server.server_address[1] if server is not None else PORT
         if not _is_trusted_local_request(self.headers, port):
-            self._json(403, {"error": {"message": "local requests only"}})
+            _reject_before_body(
+                self, 403, {"error": {"message": "local requests only"}})
             return
         if self.path not in ("/v1/chat/completions",
                              "/v1/chat/completions/"):
+            self.close_connection = True
             self.send_error(404)
             return
         if self.headers.get("Transfer-Encoding") is not None:
-            self._json(400, {
+            _reject_before_body(self, 400, {
                 "error": {"message": "transfer-encoding is not supported"}})
             return
         try:
             length = _parse_content_length(
                 _content_length_header(self.headers))
         except ValueError:
-            self._json(400, {"error": {"message": "bad content-length"}})
+            _reject_before_body(
+                self, 400, {"error": {"message": "bad content-length"}})
             return
         if length < 0 or length > MAX_BODY_BYTES:
-            self._json(413, {"error": {"message": "payload too large"}})
+            _reject_before_body(
+                self, 413, {"error": {"message": "payload too large"}})
             return
         get_all = getattr(self.headers, "get_all", None)
         expect_values = get_all("Expect") if get_all else None
@@ -525,7 +536,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if (len(expect_values) != 1
                     or expect_values[0].strip().lower() != "100-continue"
                     or self.request_version != "HTTP/1.1"):
-                self._json(417, {
+                _reject_before_body(self, 417, {
                     "error": {"message": "expectation is not supported"}})
                 return
             self.wfile.write(b"HTTP/1.1 100 Continue\r\n\r\n")
@@ -534,13 +545,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = _read_request_body(
                 self.rfile, getattr(self, "connection", None), length)
             if len(body) != length:
-                self._json(400, {
+                _reject_before_body(self, 400, {
                     "error": {"message": "incomplete request body"}})
                 return
             payload = json.loads(
                 body or b"{}", object_pairs_hook=_no_duplicate_object)
         except (socket.timeout, TimeoutError):
-            self._json(408, {
+            _reject_before_body(self, 408, {
                 "error": {"message": "request body read timed out"}})
             return
         except Exception:
