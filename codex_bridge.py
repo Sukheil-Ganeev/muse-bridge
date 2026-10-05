@@ -169,8 +169,8 @@ def run_codex(model: str, prompt: str) -> str:
                 stdin=stdin_fp, capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=EXEC_TIMEOUT)
         text = Path(out_path).read_text(encoding="utf-8",
-                                       errors="replace").strip()
-        if not text:
+                                       errors="replace")
+        if not text.strip():
             err = (proc.stderr or "")[-500:]
             raise RuntimeError("codex exec produced no text. " + err)
         return text
