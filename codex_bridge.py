@@ -58,6 +58,8 @@ MAX_BODY_BYTES = 4 * 1024 * 1024
 POST_BODY_READ_TIMEOUT = 30
 REQUEST_IDLE_TIMEOUT = 30
 REQUEST_HEADER_READ_TIMEOUT = 30
+MESSAGE_ROLES = {"system", "developer", "user", "assistant", "tool",
+                 "function"}
 
 
 def _no_duplicate_object(pairs):
@@ -93,6 +95,13 @@ def find_codex() -> str:
 
 
 CODEX_EXE = find_codex()
+
+
+def _codex_command(args):
+    """Build the subprocess command, wrapping .cmd/.bat on Windows."""
+    if os.name == "nt" and CODEX_EXE.lower().endswith((".cmd", ".bat")):
+        return ["cmd", "/c", CODEX_EXE] + args
+    return [CODEX_EXE] + args
 
 
 def _parse_content_length(value):
@@ -169,8 +178,8 @@ def run_codex(model: str, prompt: str) -> str:
             out_path = out_fp.name
         with open(prompt_path, encoding="utf-8") as stdin_fp:
             proc = subprocess.run(
-                [CODEX_EXE, "exec", "-s", "read-only", "-m", model,
-                 "-o", out_path, "-"],
+                _codex_command(["exec", "-s", "read-only", "-m", model,
+                                "-o", out_path, "-"]),
                 stdin=stdin_fp, capture_output=True, text=True,
                 encoding="utf-8", errors="replace", timeout=EXEC_TIMEOUT)
         text = Path(out_path).read_text(encoding="utf-8",
@@ -305,6 +314,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if (not isinstance(messages, list)
                 or any(not isinstance(message, dict) for message in messages)):
             self._json(400, {"error": {"message": "messages must be a list of objects"}})
+            return
+        if any("role" in message and (
+                not isinstance(message["role"], str)
+                or message["role"] not in MESSAGE_ROLES)
+               for message in messages):
+            self._json(400, {"error": {"message": "message role is not supported"}})
             return
         if payload.get("stream") is True:
             self._json(400, {
