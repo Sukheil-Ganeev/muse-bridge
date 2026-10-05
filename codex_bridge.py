@@ -306,6 +306,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 or any(not isinstance(message, dict) for message in messages)):
             self._json(400, {"error": {"message": "messages must be a list of objects"}})
             return
+        if payload.get("stream") is True:
+            self._json(400, {
+                "error": {"message": "streaming is not supported"}})
+            return
         model = str(payload.get("model") or MODELS[0])
         if model not in MODELS:
             model = MODELS[0]

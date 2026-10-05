@@ -205,6 +205,22 @@ class CodexPostValidationTests(unittest.TestCase):
         self.cb.Handler.do_POST(handler)
         self.assertEqual(response["status"], 400)
 
+    def test_stream_true_is_rejected_without_running_cli(self):
+        body = json.dumps({"messages": [], "stream": True}).encode()
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(self.cb, "run_codex", return_value="ok") as run:
+            self.cb.Handler.do_POST(handler)
+        self.assertEqual(response["status"], 400)
+        self.assertIn("streaming is not supported",
+                      response["body"]["error"]["message"])
+        run.assert_not_called()
+
 
 class CodexContentLengthTests(unittest.TestCase):
     def setUp(self):
