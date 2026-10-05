@@ -855,6 +855,47 @@ class CodexOutputIsolationTests(unittest.TestCase):
             self.assertEqual(os.listdir(temp_dir), [])
 
 
+class CodexOutputWhitespaceTests(unittest.TestCase):
+    def setUp(self):
+        self.cb = fresh_codex_bridge()
+
+    def test_preserves_leading_and_trailing_whitespace(self):
+        answer = "\n  first line\n    indented line\n\n"
+
+        def fake_run(args, **_kwargs):
+            output_path = args[args.index("-o") + 1]
+            with open(output_path, "w", encoding="utf-8") as output:
+                output.write(answer)
+            return mock.Mock(stderr="")
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with self.cb.tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+            with mock.patch.object(self.cb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.cb.subprocess, "run",
+                                   side_effect=fake_run):
+                self.assertEqual(self.cb.run_codex("m", "p"), answer)
+            self.assertEqual(os.listdir(temp_dir), [])
+
+    def test_whitespace_only_output_is_still_rejected(self):
+        def fake_run(args, **_kwargs):
+            output_path = args[args.index("-o") + 1]
+            with open(output_path, "w", encoding="utf-8") as output:
+                output.write(" \n\t")
+            return mock.Mock(stderr="")
+
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with self.cb.tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+            with mock.patch.object(self.cb.tempfile, "gettempdir",
+                                   return_value=temp_dir), \
+                 mock.patch.object(self.cb.subprocess, "run",
+                                   side_effect=fake_run):
+                with self.assertRaisesRegex(RuntimeError,
+                                            "produced no text"):
+                    self.cb.run_codex("m", "p")
+            self.assertEqual(os.listdir(temp_dir), [])
+
+
 class TerminalFailureTests(unittest.TestCase):
     def setUp(self):
         self.mb = fresh_bridge()
