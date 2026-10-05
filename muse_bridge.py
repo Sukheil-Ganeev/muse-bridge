@@ -66,6 +66,8 @@ MAX_BODY_BYTES = 4 * 1024 * 1024
 POST_BODY_READ_TIMEOUT = 30
 REQUEST_IDLE_TIMEOUT = 30
 REQUEST_HEADER_READ_TIMEOUT = 30
+MESSAGE_ROLES = {"system", "developer", "user", "assistant", "tool",
+                 "function"}
 
 
 def _no_duplicate_object(pairs):
@@ -564,6 +566,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if (not isinstance(messages, list)
                 or any(not isinstance(m, dict) for m in messages)):
             self._json(400, {"error": {"message": "messages must be a list of objects"}})
+            return
+        if any("role" in message and (
+                not isinstance(message["role"], str)
+                or message["role"] not in MESSAGE_ROLES)
+               for message in messages):
+            self._json(400, {"error": {"message": "message role is not supported"}})
             return
         model = str(payload.get("model") or DEFAULT_MODEL)
         if model not in MODELS:
