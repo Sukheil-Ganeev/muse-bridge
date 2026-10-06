@@ -321,6 +321,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                for message in messages):
             self._json(400, {"error": {"message": "message role is not supported"}})
             return
+        if any(isinstance(message.get("content"), list)
+               and any(not isinstance(part, dict)
+                       or part.get("type", "text") != "text"
+                       for part in message["content"])
+               for message in messages):
+            self._json(400, {
+                "error": {"message": "only text content parts are supported"}})
+            return
         if payload.get("stream") is True:
             self._json(400, {
                 "error": {"message": "streaming is not supported"}})

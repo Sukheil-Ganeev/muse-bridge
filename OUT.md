@@ -12,7 +12,7 @@
 - `docs/rounds/R346-message-role-validation.md`,
   `docs/rounds/R356-windows-codex-command-wrapper.md`,
   `docs/rounds/QUEUE.md`: спецификации и статусы раундов.
-- `OUT.md`: этот отчёт.
+- `OUT.md`: прежний отчёт сохранён; ниже добавлен результат R366.
 
 ## Проверки
 
@@ -28,7 +28,7 @@
 - R356 после исправления: адресные unittest — 2 теста, `OK`.
   Они проверяют построение argv; фактический запуск Windows `cmd.exe` в Linux
   sandbox не выполнялся.
-- Общий офлайн-набор через `unittest`: 107 тестов за 0.590 сек., `OK`.
+- Общий офлайн-набор прежних раундов: 107 тестов за 0.590 сек., `OK`.
   Классы `PostHandlerTests` и `HealthTests`, которым нужен loopback-сокет,
   исключены из этого офлайн-прогона.
 - `python3 -m py_compile muse_bridge.py codex_bridge.py tests/test_bridge.py` —
@@ -41,3 +41,62 @@
 
 - Loopback HTTP-тесты здесь не запускались; живой сетевой результат не заявлен.
 - Изменения оставлены в рабочем дереве для переноса родительским агентом.
+
+## R366 — нетекстовые части запроса не теряются молча
+
+До начала работы `OUT.md` был удалён в рабочем дереве. По требованию задания
+отчёт восстановлен из версии HEAD; прежний текст сохранён, ниже добавлена новая
+часть.
+
+**Итог:** Muse Bridge и Codex Bridge теперь отвечают 400 до запуска CLI, если
+массив `content` содержит не-объект или явный тип части, отличный от `text`.
+Текстовые части, включая части без поля `type`, сохраняют прежнее поведение.
+
+**Файлы R366:** `muse_bridge.py`, `codex_bridge.py`, `tests/test_bridge.py`,
+`docs/rounds/R366-text-only-content-parts.md`, `docs/rounds/QUEUE.md`, `OUT.md`.
+
+**Тест до исправления:**
+
+```text
+$ PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest test_bridge.UnsupportedContentPartTests
+Ran 1 test in 0.020s
+FAILED (failures=2)
+```
+
+Оба подслучая получили 200 вместо 400: мосты отбрасывали `image_url` и всё же
+вызывали CLI.
+
+**После исправления:** выбранный офлайн-набор из 108 unittest прошёл за 0.614 сек.:
+
+```text
+Ran 108 tests in 0.614s
+OK
+```
+
+В набор вошли тесты мостов без сетевого bind, установщиков и очереди раундов;
+`PostHandlerTests` и `HealthTests` не запускались. Точный запуск:
+
+```text
+PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest \
+test_bridge.ExtractEffortTests test_bridge.BuildPromptTests test_bridge.ModelListTests \
+test_bridge.FindMuseTests test_bridge.FindCodexTests test_bridge.CodexWindowsCommandTests \
+test_bridge.CodexBuildPromptTests test_bridge.CodexPostValidationTests \
+test_bridge.CodexContentLengthTests test_bridge.RequestExpectationTests \
+test_bridge.RequestOriginProtectionTests test_bridge.EarlyRejectConnectionTests \
+test_bridge.RequestHeaderTimeoutTests test_bridge.AbsoluteRequestHeaderDeadlineTests \
+test_bridge.PostBodyDeadlineTests test_bridge.MusePostValidationTests \
+test_bridge.MessageRoleValidationTests test_bridge.UnsupportedContentPartTests \
+test_bridge.TruncatedBodyTests test_bridge.DuplicateContentLengthTests \
+test_bridge.TransferEncodingTests test_bridge.CodexOutputIsolationTests \
+test_bridge.CodexOutputWhitespaceTests test_bridge.TerminalFailureTests \
+test_bridge.PromptTempCreationFailureTests test_bridge.ContentLengthParsingTests \
+test_bridge.StreamAbortTests test_bridge.StreamKeepaliveAbortTests \
+test_bridge.StreamKeepaliveCompletionTests test_install_scripts \
+test_round_queue.RoundQueueTests
+```
+
+`py_compile` успешно проверил три изменённых Python-файла; байткод записывался
+во временные файлы внутри репозитория, затем эти файлы удалены. `git diff --check`
+успешен. `pytest` недоступен, `tests/test_env_port.py` (pytest-style) не запускался.
+Commit и push не выполнялись. Остались незапущенные loopback-проверки; фактический
+запуск Windows `cmd.exe` не проверялся в Linux sandbox.

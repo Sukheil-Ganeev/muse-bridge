@@ -573,6 +573,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                for message in messages):
             self._json(400, {"error": {"message": "message role is not supported"}})
             return
+        if any(isinstance(message.get("content"), list)
+               and any(not isinstance(part, dict)
+                       or part.get("type", "text") != "text"
+                       for part in message["content"])
+               for message in messages):
+            self._json(400, {
+                "error": {"message": "only text content parts are supported"}})
+            return
         model = str(payload.get("model") or DEFAULT_MODEL)
         if model not in MODELS:
             model = DEFAULT_MODEL
