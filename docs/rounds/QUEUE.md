@@ -2,7 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
-| R406 | POST: отклонять одиночные Unicode-суррогаты до запуска CLI | ✅ локально, без commit/push |
+| R406 | POST: отклонять одиночные Unicode-суррогаты до запуска CLI | ✅ [#50](https://github.com/Sukheil-Ganeev/muse-bridge/pull/50) |
 | R396 | HTTP: отклонять повторные Host и Origin | ✅ локально, без commit/push |
 | R386 | stream: закрывать соединение после ошибки потока | ✅ локально, без commit/push |
 | R376 | HTTP JSON: принимать только UTF-8-тело | ✅ локально, без commit/push |
