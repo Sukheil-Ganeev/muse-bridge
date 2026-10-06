@@ -445,6 +445,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
+        self.close_connection = True
 
         def chunk(content=None, finish=None):
             delta = {} if content is None else {"content": content}
@@ -551,7 +552,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "error": {"message": "incomplete request body"}})
                 return
             payload = json.loads(
-                body or b"{}", object_pairs_hook=_no_duplicate_object)
+                (body or b"{}").decode("utf-8"),
+                object_pairs_hook=_no_duplicate_object)
         except (socket.timeout, TimeoutError):
             _reject_before_body(self, 408, {
                 "error": {"message": "request body read timed out"}})

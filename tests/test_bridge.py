@@ -876,6 +876,29 @@ class UnsupportedContentPartTests(unittest.TestCase):
                 runner.assert_not_called()
 
 
+class NonUtf8JsonBodyTests(unittest.TestCase):
+    def test_non_utf8_json_is_rejected_before_cli(self):
+        payload = {"messages": [{"role": "user", "content": "hello"}]}
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            for encoding in ("utf-16", "utf-32"):
+                with self.subTest(bridge=runner_name, encoding=encoding):
+                    body = json.dumps(payload).encode(encoding)
+                    response = {}
+                    handler = type("HandlerStub", (), {})()
+                    handler.path = "/v1/chat/completions"
+                    handler.headers = {"Content-Length": str(len(body))}
+                    handler.rfile = io.BytesIO(body)
+                    handler._json = lambda status, obj: response.update(
+                        status=status, body=obj)
+                    with mock.patch.object(
+                            module, runner_name, return_value="ok") as runner:
+                        module.Handler.do_POST(handler)
+                    self.assertEqual(response["status"], 400)
+                    runner.assert_not_called()
+
+
 class TruncatedBodyTests(unittest.TestCase):
     def _post_with_short_body(self, bridge, runner_name):
         body = b'{"messages":[]}'
@@ -1556,6 +1579,37 @@ class StreamAbortTests(unittest.TestCase):
 
         self.assertFalse(os.path.exists(recorded["path"]))
         self.assertTrue(recorded["err_fp"].closed)
+
+
+class StreamHandlerConnectionTests(unittest.TestCase):
+    def test_stream_failure_closes_connection_after_close_header(self):
+        mb = fresh_bridge()
+        response = {"headers": []}
+
+        class HandlerStub:
+            close_connection = False
+            path = "/v1/chat/completions"
+            wfile = io.BytesIO()
+
+            def send_response(self, status):
+                response["status"] = status
+
+            def send_header(self, name, value):
+                response["headers"].append((name, value))
+
+            def end_headers(self):
+                pass
+
+            def _sse(self, _obj, lock=None):
+                pass
+
+        handler = HandlerStub()
+        with mock.patch.object(mb, "stream_muse",
+                               side_effect=RuntimeError("stream failed")):
+            mb.Handler._stream_chat(handler, "m", "prompt", "high")
+
+        self.assertIn(("Connection", "close"), response["headers"])
+        self.assertTrue(handler.close_connection)
 
 
 class StreamKeepaliveAbortTests(unittest.TestCase):
