@@ -100,3 +100,24 @@ test_round_queue.RoundQueueTests
 успешен. `pytest` недоступен, `tests/test_env_port.py` (pytest-style) не запускался.
 Commit и push не выполнялись. Остались незапущенные loopback-проверки; фактический
 запуск Windows `cmd.exe` не проверялся в Linux sandbox.
+
+## R406 — отклонять одиночные Unicode-суррогаты до запуска CLI
+
+**Итог:** Muse Bridge и Codex Bridge теперь отвечают 400, если собранный промпт
+не кодируется в UTF-8 из-за экранированного одиночного суррогата. Процесс CLI не
+запускается. Обычный Unicode-текст и потоковые запросы без такого значения
+сохраняют прежнее поведение.
+
+**Файлы R406:** `muse_bridge.py`, `codex_bridge.py`, `tests/test_bridge.py`,
+`docs/rounds/R406-reject-escaped-surrogates.md`, `docs/rounds/QUEUE.md`, `OUT.md`.
+
+**Тест до исправления:** `EscapedSurrogateJsonTests` — 1 тест, 2 провала; оба
+моста вернули 502 вместо 400.
+
+**После исправления:** тест R406 прошёл. Выбранный офлайн-набор — 113 тестов за
+0.600 сек., `OK`. В него не вошли `PostHandlerTests` и `HealthTests`, которым
+нужны loopback-сокеты. `python3 -m py_compile muse_bridge.py codex_bridge.py
+tests/test_bridge.py` и `git diff --check` — успешно.
+
+Commit и push не выполнялись; результат оставлен для переноса родительским
+агентом.

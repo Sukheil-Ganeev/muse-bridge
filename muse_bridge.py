@@ -587,6 +587,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if model not in MODELS:
             model = DEFAULT_MODEL
         prompt = build_prompt(payload.get("messages"))
+        try:
+            prompt.encode("utf-8")
+        except UnicodeEncodeError:
+            self._json(400, {
+                "error": {"message": "messages must contain valid Unicode text"}})
+            return
         effort = extract_effort(payload)
         if payload.get("stream") is True:
             self._stream_chat(model, prompt, effort)

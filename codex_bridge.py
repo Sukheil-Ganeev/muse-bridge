@@ -339,6 +339,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             model = MODELS[0]
         prompt = build_prompt(payload.get("messages"))
         try:
+            prompt.encode("utf-8")
+        except UnicodeEncodeError:
+            self._json(400, {
+                "error": {"message": "messages must contain valid Unicode text"}})
+            return
+        try:
             text = run_codex(model, prompt)
         except Exception as e:
             self._json(502, {"error": {"message": str(e)[:300]}})

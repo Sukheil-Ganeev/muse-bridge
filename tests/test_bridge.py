@@ -948,6 +948,34 @@ class NonUtf8JsonBodyTests(unittest.TestCase):
                     runner.assert_not_called()
 
 
+class EscapedSurrogateJsonTests(unittest.TestCase):
+    def test_escaped_surrogate_in_prompt_is_rejected_before_cli(self):
+        body = b'{"messages":[{"role":"user","content":"\\ud800"}]}'
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            with self.subTest(bridge=runner_name), \
+                    module.tempfile.TemporaryDirectory(dir=repo) as temp_dir:
+                response = {}
+                handler = type("HandlerStub", (), {})()
+                handler.path = "/v1/chat/completions"
+                handler.headers = {"Content-Length": str(len(body))}
+                handler.rfile = io.BytesIO(body)
+                handler._json = lambda status, obj: response.update(
+                    status=status, body=obj)
+                with mock.patch.object(module.tempfile, "gettempdir",
+                                       return_value=temp_dir), \
+                     mock.patch.object(module.subprocess, "run") as run, \
+                     mock.patch.object(module.subprocess, "Popen") as popen:
+                    module.Handler.do_POST(handler)
+                self.assertEqual(response["status"], 400)
+                self.assertIn("Unicode", response["body"]["error"]["message"])
+                run.assert_not_called()
+                popen.assert_not_called()
+                self.assertEqual(os.listdir(temp_dir), [])
+
+
 class TruncatedBodyTests(unittest.TestCase):
     def _post_with_short_body(self, bridge, runner_name):
         body = b'{"messages":[]}'
