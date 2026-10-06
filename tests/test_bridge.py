@@ -846,6 +846,36 @@ class MessageRoleValidationTests(unittest.TestCase):
                     runner.assert_not_called()
 
 
+class UnsupportedContentPartTests(unittest.TestCase):
+    def test_non_text_content_parts_are_rejected_before_cli(self):
+        payload = {"messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is in this picture?"},
+                {"type": "image_url", "image_url": {
+                    "url": "https://example.test/picture.png"}},
+            ],
+        }]}
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            with self.subTest(bridge=runner_name):
+                body = json.dumps(payload).encode()
+                response = {}
+                handler = type("HandlerStub", (), {})()
+                handler.path = "/v1/chat/completions"
+                handler.headers = {"Content-Length": str(len(body))}
+                handler.rfile = io.BytesIO(body)
+                handler._json = lambda status, obj: response.update(
+                    status=status, body=obj)
+                with mock.patch.object(
+                        module, runner_name, return_value="ok") as runner:
+                    module.Handler.do_POST(handler)
+                self.assertEqual(response["status"], 400)
+                self.assertIn("text", response["body"]["error"]["message"])
+                runner.assert_not_called()
+
+
 class TruncatedBodyTests(unittest.TestCase):
     def _post_with_short_body(self, bridge, runner_name):
         body = b'{"messages":[]}'
