@@ -470,6 +470,55 @@ class RequestOriginProtectionTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         runner.assert_called_once()
 
+    def _request_with_duplicate_header(self, module, method, runner_name,
+                                        header_name, values):
+        request_headers = Message()
+        if header_name.lower() != "host":
+            request_headers.add_header(
+                "Host", f"127.0.0.1:{module.PORT}")
+        for value in values:
+            request_headers.add_header(header_name, value)
+        response = {}
+        handler = type("HandlerStub", (), {})()
+        handler.path = ("/health" if method == "GET"
+                        else "/v1/chat/completions")
+        handler.headers = request_headers
+        handler.close_connection = False
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        if method == "POST":
+            body = json.dumps({"messages": []}).encode()
+            request_headers.add_header("Content-Length", str(len(body)))
+            handler.rfile = io.BytesIO(body)
+        runner = mock.patch.object(module, runner_name, return_value="ok")
+        with runner as mocked_runner:
+            getattr(module.Handler, f"do_{method}")(handler)
+        return response, mocked_runner
+
+    def test_duplicate_host_is_rejected_in_both_bridges(self):
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            with self.subTest(module=module.__name__):
+                response, runner = self._request_with_duplicate_header(
+                    module, "POST", runner_name, "Host",
+                    [f"127.0.0.1:{module.PORT}",
+                     f"attacker.example:{module.PORT}"])
+                self.assertEqual(response["status"], 403)
+                runner.assert_not_called()
+
+    def test_duplicate_origin_is_rejected_in_both_bridges(self):
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            with self.subTest(module=module.__name__):
+                response, runner = self._request_with_duplicate_header(
+                    module, "GET", runner_name, "Origin",
+                    [f"http://localhost:{module.PORT}",
+                     "https://attacker.example"])
+                self.assertEqual(response["status"], 403)
+                runner.assert_not_called()
+
 
 class EarlyRejectConnectionTests(unittest.TestCase):
     def _post(self, module, runner_name, headers, body):

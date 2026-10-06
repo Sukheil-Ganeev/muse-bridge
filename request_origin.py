@@ -29,6 +29,12 @@ def is_trusted_local_request(headers, expected_port):
     Native local clients commonly omit Origin, so its absence is allowed. A
     supplied Host or Origin must identify this loopback HTTP service.
     """
+    get_all = getattr(headers, "get_all", None)
+    if get_all is not None and any(
+            len(values) > 1
+            for values in (get_all("Host") or [], get_all("Origin") or [])):
+        return False
+
     host = headers.get("Host")
     if host is not None:
         try:
