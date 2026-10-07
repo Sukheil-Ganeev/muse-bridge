@@ -190,7 +190,8 @@ class CodexPostValidationTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body))}
+        handler.headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -218,7 +219,8 @@ class CodexPostValidationTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body))}
+        handler.headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -230,7 +232,8 @@ class CodexPostValidationTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body))}
+        handler.headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -287,6 +290,7 @@ class RequestExpectationTests(unittest.TestCase):
         handler.headers = {
             "Host": f"127.0.0.1:{module.PORT}",
             "Content-Length": str(len(body)),
+            "Content-Type": "application/json",
             "Expect": expectation,
         }
         handler.rfile = BodyReader(body)
@@ -332,12 +336,75 @@ class RequestExpectationTests(unittest.TestCase):
             fresh_codex_bridge(), "run_codex")
 
 
+class JsonContentTypeTests(unittest.TestCase):
+    def _post(self, module, runner_name, content_types):
+        body = json.dumps({"messages": []}).encode()
+        headers = Message()
+        headers.add_header("Host", f"127.0.0.1:{module.PORT}")
+        headers.add_header("Content-Length", str(len(body)))
+        for content_type in content_types:
+            headers.add_header("Content-Type", content_type)
+        response = {}
+        reads = []
+
+        class BodyReader(io.BytesIO):
+            def read(self, size=-1):
+                reads.append(size)
+                return super().read(size)
+
+        handler = type("HandlerStub", (), {})()
+        handler.path = "/v1/chat/completions"
+        handler.headers = headers
+        handler.rfile = BodyReader(body)
+        handler._json = lambda status, obj: response.update(
+            status=status, body=obj)
+        with mock.patch.object(module, runner_name, return_value="ok") as run:
+            module.Handler.do_POST(handler)
+        return response, run, reads
+
+    def _assert_unsupported_type_rejected(self, module, runner_name,
+                                          content_types):
+        response, run, reads = self._post(module, runner_name, content_types)
+        self.assertEqual(response["status"], 415)
+        run.assert_not_called()
+        self.assertEqual(reads, [])
+
+    def test_muse_requires_json_content_type(self):
+        module = fresh_bridge()
+        self._assert_unsupported_type_rejected(module, "run_muse", [])
+        self._assert_unsupported_type_rejected(
+            module, "run_muse", ["text/plain"])
+        self._assert_unsupported_type_rejected(
+            module, "run_muse", ["application/json", "text/plain"])
+
+    def test_codex_requires_json_content_type(self):
+        module = fresh_codex_bridge()
+        self._assert_unsupported_type_rejected(module, "run_codex", [])
+        self._assert_unsupported_type_rejected(
+            module, "run_codex", ["text/plain"])
+        self._assert_unsupported_type_rejected(
+            module, "run_codex", ["application/json", "text/plain"])
+
+    def test_json_media_type_accepts_charset_parameter(self):
+        for module, runner_name in (
+                (fresh_bridge(), "run_muse"),
+                (fresh_codex_bridge(), "run_codex")):
+            with self.subTest(bridge=module.__name__):
+                response, run, reads = self._post(
+                    module, runner_name,
+                    ["Application/JSON; charset=utf-8"])
+                self.assertEqual(response["status"], 200)
+                run.assert_called_once()
+                self.assertEqual(len(reads), 1)
+
+
 class RequestOriginProtectionTests(unittest.TestCase):
     def _post(self, module, runner_name, headers):
         payload = {"messages": [{"role": "user", "content": "hi"}]}
         body = json.dumps(payload).encode()
         response = {}
-        request_headers = {"Content-Length": str(len(body)), **headers}
+        request_headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json", **headers}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
         handler.headers = request_headers
@@ -489,6 +556,8 @@ class RequestOriginProtectionTests(unittest.TestCase):
         if method == "POST":
             body = json.dumps({"messages": []}).encode()
             request_headers.add_header("Content-Length", str(len(body)))
+            if header_name.lower() != "content-type":
+                request_headers.add_header("Content-Type", "application/json")
             handler.rfile = io.BytesIO(body)
         runner = mock.patch.object(module, runner_name, return_value="ok")
         with runner as mocked_runner:
@@ -545,6 +614,7 @@ class EarlyRejectConnectionTests(unittest.TestCase):
             "Host": f"127.0.0.1:{module.PORT}",
             "Origin": "https://attacker.example",
             "Content-Length": str(len(body)),
+            "Content-Type": "application/json",
         }, body)
         self.assertEqual(response["status"], 403)
         self.assertEqual(handler.rfile.tell(), 0)
@@ -567,6 +637,7 @@ class EarlyRejectConnectionTests(unittest.TestCase):
             response, handler, runner = self._post(module, runner_name, {
                 "Host": f"127.0.0.1:{module.PORT}",
                 "Content-Length": str(len(body) + 1),
+                "Content-Type": "application/json",
             }, body)
             self.assertEqual(response["status"], 400)
             self.assertTrue(handler.close_connection)
@@ -767,7 +838,8 @@ class PostBodyDeadlineTests(unittest.TestCase):
 
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": "10"}
+        handler.headers = {"Content-Length": "10",
+                           "Content-Type": "application/json"}
         handler.rfile = SlowBody()
         handler.connection = self.FakeConnection(timeout=None)
         handler._json = lambda status, obj: response.update(
@@ -843,7 +915,8 @@ class MusePostValidationTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body))}
+        handler.headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -862,7 +935,8 @@ class MusePostValidationTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body))}
+        handler.headers = {"Content-Length": str(len(body)),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -882,7 +956,8 @@ class MessageRoleValidationTests(unittest.TestCase):
                     response = {}
                     handler = type("HandlerStub", (), {})()
                     handler.path = "/v1/chat/completions"
-                    handler.headers = {"Content-Length": str(len(body))}
+                    handler.headers = {"Content-Length": str(len(body)),
+                                       "Content-Type": "application/json"}
                     handler.rfile = io.BytesIO(body)
                     handler._json = lambda status, obj: response.update(
                         status=status, body=obj)
@@ -913,7 +988,8 @@ class UnsupportedContentPartTests(unittest.TestCase):
                 response = {}
                 handler = type("HandlerStub", (), {})()
                 handler.path = "/v1/chat/completions"
-                handler.headers = {"Content-Length": str(len(body))}
+                handler.headers = {"Content-Length": str(len(body)),
+                                   "Content-Type": "application/json"}
                 handler.rfile = io.BytesIO(body)
                 handler._json = lambda status, obj: response.update(
                     status=status, body=obj)
@@ -937,7 +1013,8 @@ class NonUtf8JsonBodyTests(unittest.TestCase):
                     response = {}
                     handler = type("HandlerStub", (), {})()
                     handler.path = "/v1/chat/completions"
-                    handler.headers = {"Content-Length": str(len(body))}
+                    handler.headers = {"Content-Length": str(len(body)),
+                                       "Content-Type": "application/json"}
                     handler.rfile = io.BytesIO(body)
                     handler._json = lambda status, obj: response.update(
                         status=status, body=obj)
@@ -960,7 +1037,8 @@ class EscapedSurrogateJsonTests(unittest.TestCase):
                 response = {}
                 handler = type("HandlerStub", (), {})()
                 handler.path = "/v1/chat/completions"
-                handler.headers = {"Content-Length": str(len(body))}
+                handler.headers = {"Content-Length": str(len(body)),
+                                   "Content-Type": "application/json"}
                 handler.rfile = io.BytesIO(body)
                 handler._json = lambda status, obj: response.update(
                     status=status, body=obj)
@@ -982,7 +1060,8 @@ class TruncatedBodyTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {"Content-Length": str(len(body) + 1)}
+        handler.headers = {"Content-Length": str(len(body) + 1),
+                           "Content-Type": "application/json"}
         handler.rfile = io.BytesIO(body)
         handler._json = lambda status, obj: response.update(
             status=status, body=obj)
@@ -1232,7 +1311,9 @@ class ContentLengthParsingTests(unittest.TestCase):
         response = {}
         handler = type("HandlerStub", (), {})()
         handler.path = "/v1/chat/completions"
-        handler.headers = {} if length is None else {"Content-Length": length}
+        handler.headers = {"Content-Type": "application/json"}
+        if length is not None:
+            handler.headers["Content-Length"] = length
         handler.rfile = io.BytesIO(b'{"messages":[]}')
         handler._json = lambda status, body: response.update(
             status=status, body=body)
