@@ -1,7 +1,7 @@
 # R516: mkdir/makedirs — exist_ok обязателен во всех tracked .py + AST-гейт
 
 **Статус:** done
-**PR:** TBD
+**PR:** #68
 **Семья:** mkdir-exist-ok
 
 ## Дефект
