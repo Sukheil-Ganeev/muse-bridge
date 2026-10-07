@@ -121,3 +121,25 @@ tests/test_bridge.py` и `git diff --check` — успешно.
 
 Commit и push не выполнялись; результат оставлен для переноса родительским
 агентом.
+
+## R436 — новый Python-файл не пропускает AST-гейт subprocess-timeout
+
+**Итог:** локальная проверка теперь замечает новые, ещё не добавленные в Git
+Python-файлы и проверяет в них ограничение ожидания дочерних процессов.
+
+**Файлы:** `tests/test_no_unbounded_subprocess.py`,
+`docs/rounds/R436-untracked-python-subprocess-gate.md`,
+`docs/rounds/QUEUE.md`, `OUT.md`.
+
+**До исправления:** новый адресный тест завершился одним провалом: временный
+неотслеживаемый `.py` отсутствовал в `_live_py_files()`.
+
+**После исправления:** `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m
+unittest test_no_unbounded_subprocess test_round_queue` — 3 теста, `OK`.
+`python3 -m py_compile tests/test_no_unbounded_subprocess.py` и
+`git diff --check` — успешно.
+
+Полный `unittest discover` выполнил 130 тестов: 13 HTTP-проверок завершились
+ошибкой sandbox при попытке открыть loopback-сокет (`PermissionError`), другие
+117 прошли. `pytest` отсутствует; ничего не устанавливалось. Временный
+`.pyc` удалён. Commit и push не выполнялись.

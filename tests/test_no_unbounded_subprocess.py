@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -28,7 +29,8 @@ MARKER = "# timeout"
 
 def _live_py_files() -> list[Path]:
     out = subprocess.run(
-        ["git", "ls-files", "-z", "*.py"],
+        ["git", "ls-files", "-z", "--cached", "--others",
+         "--exclude-standard", "--", "*.py"],
         cwd=ROOT, capture_output=True, check=True, timeout=30,
     )
     files = []
@@ -95,6 +97,16 @@ class _PopenVars(ast.NodeVisitor):
 
 
 class TestNoUnboundedSubprocess(unittest.TestCase):
+    def test_untracked_python_file_is_included(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="round436-", dir=ROOT) as tmp:
+            candidate = Path(tmp) / "new_module.py"
+            candidate.write_text(
+                "import subprocess\nsubprocess.run(['example'])\n",
+                encoding="utf-8",
+            )
+
+            self.assertIn(candidate, _live_py_files())
+
     def test_live_subprocess_bounded(self) -> None:
         problems: list[str] = []
         for path in _live_py_files():
