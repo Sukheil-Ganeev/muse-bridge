@@ -164,6 +164,36 @@ class RoundQueueTests(unittest.TestCase):
             self.assertIn("R999", result.failures[0][1])
             self.assertIn("duplicate queue entries", result.failures[0][1])
 
+    def test_latest_round_specs_must_be_in_queue(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            round_dir = Path(temp_dir)
+            round_ids = (1000, 990, 980, 970, 1010)
+            for round_id in round_ids:
+                (round_dir / f"R{round_id}-round.md").write_text(
+                    f"# R{round_id}\n\n**Статус:** done\n",
+                    encoding="utf-8")
+            (round_dir / "QUEUE.md").write_text(
+                "| Раунд | Тема | Статус |\n"
+                "|---|---|---|\n"
+                "| R1000 | recent | ✅ done |\n"
+                "| R990 | recent | ✅ done |\n"
+                "| R980 | recent | ✅ done |\n"
+                "| R970 | stale | ✅ done |\n",
+                encoding="utf-8",
+            )
+
+            result = unittest.TestResult()
+            case = RoundQueueTests(
+                "test_completed_rounds_are_not_listed_as_in_progress")
+            with mock.patch(__name__ + ".ROUND_DIR", round_dir):
+                case.run(result)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(len(result.failures), 1,
+                             "the gate must detect a recent spec omitted from the queue")
+            self.assertIn("R1010", result.failures[0][1])
+            self.assertIn("R970", result.failures[0][1])
+
     def test_completed_rounds_are_not_listed_as_in_progress(self):
         queue = (ROUND_DIR / "QUEUE.md").read_text(encoding="utf-8")
         stale = []
@@ -207,6 +237,28 @@ class RoundQueueTests(unittest.TestCase):
             if spec_complete != queue_complete:
                 stale.append(
                     f"R{round_number}: queue/spec completion mismatch")
+
+        spec_round_numbers = set()
+        for spec_path in ROUND_DIR.glob("R*-*.md"):
+            match = re.match(r"^R([0-9]+)-", spec_path.name)
+            if match:
+                spec_round_numbers.add(match.group(1))
+        expected_recent = set(sorted(
+            spec_round_numbers, key=int, reverse=True)[:4])
+        if seen_round_numbers != expected_recent:
+            missing = sorted(expected_recent - seen_round_numbers,
+                             key=int, reverse=True)
+            stale_entries = sorted(seen_round_numbers - expected_recent,
+                                   key=int, reverse=True)
+            details = []
+            if missing:
+                details.append("missing " + ", ".join(
+                    f"R{number}" for number in missing))
+            if stale_entries:
+                details.append("outside recent window " + ", ".join(
+                    f"R{number}" for number in stale_entries))
+            stale.append("QUEUE.md must list the four latest round specs: "
+                         + "; ".join(details))
 
         self.assertEqual(stale, [], "completed rounds still look open in QUEUE.md")
 
