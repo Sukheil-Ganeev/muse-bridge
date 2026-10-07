@@ -194,6 +194,28 @@ class RoundQueueTests(unittest.TestCase):
             self.assertIn("R1010", result.failures[0][1])
             self.assertIn("R970", result.failures[0][1])
 
+    def test_done_synonym_is_recognized_as_completed(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            round_dir = Path(temp_dir)
+            (round_dir / "QUEUE.md").write_text(
+                "| Раунд | Тема | Статус |\n"
+                "|---|---|---|\n"
+                "| R999 | completed synonym | ✅ PR #1 |\n",
+                encoding="utf-8",
+            )
+            (round_dir / "R999-completed.md").write_text(
+                "# R999\n\n**Статус:** ✅ сделано\n", encoding="utf-8")
+
+            result = unittest.TestResult()
+            case = RoundQueueTests(
+                "test_completed_rounds_are_not_listed_as_in_progress")
+            with mock.patch(__name__ + ".ROUND_DIR", round_dir):
+                case.run(result)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(result.failures, [],
+                             "the gate must recognize 'сделано' as completion")
+
     def test_completed_rounds_are_not_listed_as_in_progress(self):
         queue = (ROUND_DIR / "QUEUE.md").read_text(encoding="utf-8")
         stale = []
@@ -225,10 +247,13 @@ class RoundQueueTests(unittest.TestCase):
             if any(not status.strip() for status in statuses):
                 stale.append(f"R{round_number}: blank spec status")
                 continue
-            spec_completion = [
-                status.strip().lower().startswith(
-                    ("done", "готово", "выполнено", "merged"))
-                for status in statuses]
+            spec_completion = []
+            for status in statuses:
+                normalized_status = status.strip().lower()
+                if normalized_status.startswith("✅"):
+                    normalized_status = normalized_status[1:].strip()
+                spec_completion.append(normalized_status.startswith(
+                    ("done", "готово", "выполнено", "сделано", "merged")))
             if any(state != spec_completion[0] for state in spec_completion[1:]):
                 stale.append(
                     f"R{round_number}: conflicting spec statuses")
