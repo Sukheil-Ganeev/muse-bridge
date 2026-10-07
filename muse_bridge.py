@@ -44,6 +44,7 @@ from request_deadline import HeaderDeadlineReader as _HeaderDeadlineReader
 from request_origin import (
     is_trusted_local_request as _is_trusted_local_request,
 )
+import logging
 
 HERE = Path(__file__).resolve().parent
 
@@ -247,7 +248,8 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
             continue
         try:
             ev = json.loads(line)
-        except Exception:
+        except Exception as _exc:
+            logging.getLogger(__name__).debug("suppressed %s", _exc)
             continue
         if ev.get("payload_type") == "run.terminal.completed":
             text = ((ev.get("payload") or {}).get("text") or text) or ""
@@ -312,8 +314,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             except Exception:
                 try:
                     proc.kill()
-                except OSError:
-                    pass
+                except OSError as _exc:
+                    logging.getLogger(__name__).debug("suppressed %s", _exc)
                 break
 
     watch = threading.Thread(target=watchdog, daemon=True)
@@ -327,7 +329,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 continue
             try:
                 ev = json.loads(line)
-            except Exception:
+            except Exception as _exc:
+                logging.getLogger(__name__).debug("suppressed %s", _exc)
                 continue
             pt = ev.get("payload_type")
             if pt == "run.output.delta":
@@ -480,8 +483,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             try:
                 self._sse({"error": {"message": str(e)[:300]}}, lock=wlock)
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).debug("suppressed %s", _exc)
             print(f"POST {self.path} -> 502 stream-failed", flush=True)
 
     def do_GET(self):

@@ -1,6 +1,7 @@
 """Allow only local browser origins and loopback Host authorities."""
 
 from urllib.parse import urlsplit
+import logging
 
 
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1"}
@@ -14,7 +15,8 @@ def _matches_local_authority(parts, expected_port, default_port):
         return False
     try:
         actual_port = parts.port
-    except ValueError:
+    except ValueError as _exc:
+        logging.getLogger(__name__).debug("suppressed %s", _exc)
         return False
     if actual_port is None:
         if default_port is None:
@@ -39,7 +41,8 @@ def is_trusted_local_request(headers, expected_port):
     if host is not None:
         try:
             host_parts = urlsplit("//" + host)
-        except ValueError:
+        except ValueError as _exc:
+            logging.getLogger(__name__).debug("suppressed %s", _exc)
             return False
         if not _matches_local_authority(host_parts, expected_port, None):
             return False
@@ -49,7 +52,8 @@ def is_trusted_local_request(headers, expected_port):
         return True
     try:
         origin_parts = urlsplit(origin)
-    except ValueError:
+    except ValueError as _exc:
+        logging.getLogger(__name__).debug("suppressed %s", _exc)
         return False
     if origin_parts.scheme.lower() != "http" or not origin_parts.netloc:
         return False
