@@ -143,3 +143,26 @@ unittest test_no_unbounded_subprocess test_round_queue` — 3 теста, `OK`.
 ошибкой sandbox при попытке открыть loopback-сокет (`PermissionError`), другие
 117 прошли. `pytest` отсутствует; ничего не устанавливалось. Временный
 `.pyc` удалён. Commit и push не выполнялись.
+
+## R466 — POST требует однозначный JSON Content-Type
+
+**Итог:** Muse Bridge и Codex Bridge отвечают HTTP 415 до чтения тела и запуска
+CLI, если Content-Type отсутствует, повторяется или объявляет не JSON.
+application/json с параметром charset принимается.
+
+**Файлы:** muse_bridge.py, codex_bridge.py, tests/test_bridge.py,
+docs/rounds/R466-json-content-type.md, docs/rounds/QUEUE.md, OUT.md.
+
+**До исправления:** PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m
+unittest test_bridge.JsonContentTypeTests — 3 теста, 2 провала; оба моста
+приняли запрос без Content-Type и вернули 200 вместо 415.
+
+**После исправления:** адресный набор — 3 теста за 0.019 сек., OK. Выбранный
+офлайн-набор мостов, дедлайнов, потоковой обработки, очереди и установщиков —
+119 тестов за 0.698 сек., OK.
+
+**Дополнительные гейты:** Python 3.14.4;
+PYTHONPYCACHEPREFIX=/tmp/muse-bridge-r466-pycache python3 -m py_compile
+muse_bridge.py codex_bridge.py tests/test_bridge.py tests/test_round_queue.py —
+код 0; git diff --check — код 0. Сокетные тесты с loopback-bind не запускались:
+sandbox запрещает bind локального порта. Commit и push не выполнялись.

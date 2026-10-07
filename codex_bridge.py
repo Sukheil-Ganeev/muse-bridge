@@ -121,6 +121,20 @@ def _content_length_header(headers):
     return values[0] if values else headers.get("Content-Length")
 
 
+def _has_json_content_type(headers):
+    get_all = getattr(headers, "get_all", None)
+    values = get_all("Content-Type") if get_all else None
+    if values is not None:
+        if len(values) != 1:
+            return False
+        value = values[0]
+    else:
+        value = headers.get("Content-Type")
+    if not isinstance(value, str):
+        return False
+    return value.split(";", 1)[0].strip().lower() == "application/json"
+
+
 def _read_request_body(reader, connection, length):
     if connection is None:
         return reader.read(length)
@@ -276,6 +290,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if length > MAX_BODY_BYTES:
             _reject_before_body(
                 self, 413, {"error": {"message": "payload too large"}})
+            return
+        if not _has_json_content_type(self.headers):
+            _reject_before_body(self, 415, {
+                "error": {"message": "content-type must be application/json"}})
             return
         get_all = getattr(self.headers, "get_all", None)
         expect_values = get_all("Expect") if get_all else None

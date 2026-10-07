@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R466 | POST: требовать однозначный `application/json` Content-Type | ✅ локально · без commit/push |
 | R456 | except → return/continue/break — подавленная ошибка ведёт в журнал | ✅ [#58](https://github.com/Sukheil-Ganeev/muse-bridge/pull/58) |
 | R446 | tests: очередь не показывает ✅ при незавершённом статусе спеки | ✅ [#56](https://github.com/Sukheil-Ganeev/muse-bridge/pull/56) |
 | R436 | tests: AST-гейт учитывает новые неигнорируемые Python-файлы до git add | ✅ [#56](https://github.com/Sukheil-Ganeev/muse-bridge/pull/56) |
