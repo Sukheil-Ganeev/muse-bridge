@@ -2,7 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
-| R476 | tests: завершённая строка очереди требует статуса в спеках | ✅ локально · без commit/push |
+| R476 | tests: завершённая строка очереди требует статуса в спеках | ✅ PR #62 |
 | R466 | POST: требовать однозначный `application/json` Content-Type | ✅ merged · PR #60 |
 | R456 | except → return/continue/break — подавленная ошибка ведёт в журнал | ✅ [#58](https://github.com/Sukheil-Ganeev/muse-bridge/pull/58) |
 | R446 | tests: очередь не показывает ✅ при незавершённом статусе спеки | ✅ [#56](https://github.com/Sukheil-Ganeev/muse-bridge/pull/56) |
