@@ -166,3 +166,25 @@ PYTHONPYCACHEPREFIX=/tmp/muse-bridge-r466-pycache python3 -m py_compile
 muse_bridge.py codex_bridge.py tests/test_bridge.py tests/test_round_queue.py —
 код 0; git diff --check — код 0. Сокетные тесты с loopback-bind не запускались:
 sandbox запрещает bind локального порта. Commit и push не выполнялись.
+
+## R476 — завершённая запись очереди требует статуса в спеке
+
+**Итог:** тестовый гейт теперь считает ошибкой завершённую строку очереди
+(`✅`), если у соответствующей спеки нет строки `**Статус:**`. Для старых
+записей без статуса, которые очередь не отмечает завершёнными, предупреждение
+не создаётся. Статусы добавлены в завершённые исторические спеки; `merged`
+распознаётся как завершённое состояние.
+
+**Файлы R476:** `tests/test_round_queue.py`, `docs/rounds/QUEUE.md`,
+`docs/rounds/R476-round-queue-requires-spec-status.md`, `OUT.md` и девять
+исторических спек R001–R011 с уже завершёнными строками в очереди.
+
+**Тест до исправления:** адресная регрессия выполнила проверку очереди, но
+получила 0 расхождений вместо ожидаемого 1: отсутствие статуса не проверялось.
+
+**После исправления:** `PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m
+unittest test_round_queue` — 3 теста, `OK`.
+
+`PYTHONPYCACHEPREFIX=/tmp/muse-bridge-r476-pycache python3 -m py_compile
+tests/test_round_queue.py` — код 0; `git diff --check` — код 0. Commit и push не
+выполняются; результат оставлен для переноса.

@@ -1,5 +1,7 @@
 # R001 — single-model-crash + контрактные тесты
 
+**Статус:** done
+
 ## Цель
 POST /v1/chat/completions не должен падать IndexError, когда
 MUSE_BRIDGE_MODELS содержит ровно одну модель (или когда клиент просит

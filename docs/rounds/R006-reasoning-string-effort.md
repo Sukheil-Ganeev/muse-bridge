@@ -1,5 +1,7 @@
 # R006 — extract_effort принимает reasoning-строку
 
+**Статус:** done
+
 ## Проблема
 
 `reasoning.get("effort")` предполагал словарь. Клиент со `"reasoning": "low"`
