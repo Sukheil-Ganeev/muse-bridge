@@ -1,5 +1,9 @@
 # R456: except → return/continue/break — подавленная ошибка ведёт в журнал
 
+**Статус:** done
+**PR:** #58
+
+
 **Статус:** выполнено
 **Семья:** silent-except-return
 
