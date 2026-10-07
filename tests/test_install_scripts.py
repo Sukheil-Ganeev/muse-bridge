@@ -3,6 +3,7 @@ import plistlib
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -143,6 +144,29 @@ class LinuxInstallTests(unittest.TestCase):
                     [validator, str(desktop)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0,
                                  result.stdout + result.stderr)
+
+
+class WindowsInstallTests(unittest.TestCase):
+    def test_autostart_helper_escapes_percent_expansions(self):
+        bridge = r"C:\Tools\100%\%USERNAME%\туризм\muse_bridge.py"
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "install" / "windows_autostart.py"),
+             bridge],
+            check=True, capture_output=True)
+
+        self.assertEqual(
+            result.stdout,
+            '@echo off\r\nchcp 65001 >nul\r\n'
+            'setlocal DisableDelayedExpansion\r\n'
+            f'start "" /min pythonw "{bridge.replace("%", "%%")}"\r\n'
+            .encode("utf-8"))
+
+    def test_batch_installer_uses_the_autostart_helper(self):
+        installer = (ROOT / "install" / "windows-install.bat").read_text(
+            encoding="utf-8")
+        self.assertIn(
+            'python "%REPO%\\install\\windows_autostart.py" '
+            '"%BRIDGE%" > "%AUTOSTART%"', installer)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R416 | install: путь с %VAR% в Windows-автозапуске отклоняется | ✅ локально, без commit/push |
 | R406 | POST: отклонять одиночные Unicode-суррогаты до запуска CLI | ✅ [#50](https://github.com/Sukheil-Ganeev/muse-bridge/pull/50) |
 | R396 | HTTP: отклонять повторные Host и Origin | ✅ локально, без commit/push |
 | R386 | stream: закрывать соединение после ошибки потока | ✅ локально, без commit/push |

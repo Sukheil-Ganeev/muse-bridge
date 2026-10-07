@@ -18,8 +18,12 @@ if errorlevel 1 (
 REM Create autostart entry (runs the bridge after every login)
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 set "AUTOSTART=%STARTUP%\muse-bridge.bat"
-> "%AUTOSTART%" echo @echo off
->> "%AUTOSTART%" echo start "" /min pythonw "%BRIDGE%"
+python "%REPO%\install\windows_autostart.py" "%BRIDGE%" > "%AUTOSTART%"
+if errorlevel 1 (
+  echo ERROR: failed to create the Windows autostart command.
+  pause
+  exit /b 1
+)
 echo OK: autostart created:
 echo     %AUTOSTART%
 
