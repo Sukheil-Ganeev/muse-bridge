@@ -188,3 +188,73 @@ unittest test_round_queue` — 3 теста, `OK`.
 `PYTHONPYCACHEPREFIX=/tmp/muse-bridge-r476-pycache python3 -m py_compile
 tests/test_round_queue.py` — код 0; `git diff --check` — код 0. Commit и push не
 выполняются; результат оставлен для переноса.
+
+## R486 — противоречивые статусы спеки не проходят гейт
+
+**Итог:** проверка раундов теперь сверяет все строки `**Статус:**` в спеке.
+Если они расходятся в том, завершён раунд или ещё открыт, проверка сообщает
+ошибку вместо того, чтобы верить только первой строке. Повторные формулировки
+одного состояния принимаются; `выполнено` распознаётся как завершение.
+
+**Файлы R486:** `tests/test_round_queue.py`, `docs/rounds/QUEUE.md`,
+`docs/rounds/R486-duplicate-spec-status.md`, `OUT.md`.
+
+**Тест до исправления:**
+
+```text
+PYTHONPATH=tests python3 -B -m unittest test_round_queue.RoundQueueTests.test_duplicate_spec_status_lines_are_rejected
+Ran 1 test
+FAILED (failures=1)
+AssertionError: 0 != 1 : the round gate must reject duplicate status lines
+```
+
+Тест показал, что завершённая первая строка скрывала следующую строку «в работе».
+При проверке всего набора также обнаружилась уже существующая пара завершённых
+формулировок `done` / `выполнено` у R456; обе теперь считаются одним состоянием.
+
+**После исправления:**
+
+```text
+PYTHONPATH=tests python3 -B -m unittest test_round_queue
+Ran 6 tests in 0.011s
+OK
+```
+
+Дополнительный тест также поймал случай пустой строки статуса, после которой
+«done» скрывалось из-за `\s*`, перешедшего через перевод строки; этот сценарий
+падал до исправления и проходит теперь.
+
+`python3 -m py_compile tests/test_round_queue.py` — код 0;
+`git diff --check` — код 0. Файл байткода, созданный компилятором в
+`tests/__pycache__`, удалён. Commit и push не выполнялись; изменения оставлены
+для переноса родительским агентом.
+
+## R496 — повторный номер раунда не проходит проверку очереди
+
+**Итог:** проверка теперь считает ошибкой второй и последующий строки очереди с
+одинаковым номером раунда, даже если обе строки ссылаются на одну спеку и имеют
+одинаковый завершённый статус.
+
+**Файлы R496:** `tests/test_round_queue.py`, `docs/rounds/QUEUE.md`,
+`docs/rounds/R496-duplicate-round-queue-ids.md`, `OUT.md`.
+
+**Тест до исправления:**
+
+```text
+PYTHONPATH=tests python3 -B -m unittest test_round_queue.RoundQueueTests.test_duplicate_round_queue_ids_are_rejected
+Ran 1 test
+FAILED (failures=1)
+AssertionError: 0 != 1 : the round gate must reject duplicate queue IDs
+```
+
+**После исправления:**
+
+```text
+PYTHONPATH=tests python3 -B -m unittest test_round_queue
+Ran 6 tests in 0.011s
+OK
+```
+
+`python3 -m py_compile tests/test_round_queue.py` и `git diff --check` — код 0.
+Временный `.pyc` удалён. Commit и push не выполнялись; изменения оставлены для
+переноса родительским агентом.
