@@ -18,18 +18,18 @@ class MacOSInstallTests(unittest.TestCase):
             temp = Path(temp_dir)
             project = temp / "project\x01bad"
             install_dir = project / "install"
-            install_dir.mkdir(parents=True)
+            install_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / "install" / "macos-install.sh",
                             install_dir / "macos-install.sh")
 
             fake_bin = temp / "bin"
-            fake_bin.mkdir()
+            fake_bin.mkdir(exist_ok=True)
             launchctl = fake_bin / "launchctl"
             launchctl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             launchctl.chmod(0o755)
 
             home = temp / "home"
-            home.mkdir()
+            home.mkdir(exist_ok=True)
             env = os.environ.copy()
             env["HOME"] = str(home)
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
@@ -47,18 +47,18 @@ class MacOSInstallTests(unittest.TestCase):
             temp = Path(temp_dir)
             project = temp / "project & <tools>"
             install_dir = project / "install"
-            install_dir.mkdir(parents=True)
+            install_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / "install" / "macos-install.sh",
                             install_dir / "macos-install.sh")
 
             fake_bin = temp / "bin"
-            fake_bin.mkdir()
+            fake_bin.mkdir(exist_ok=True)
             launchctl = fake_bin / "launchctl"
             launchctl.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             launchctl.chmod(0o755)
 
             home = temp / "home"
-            home.mkdir()
+            home.mkdir(exist_ok=True)
             env = os.environ.copy()
             env["HOME"] = str(home)
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
@@ -78,18 +78,18 @@ class LinuxInstallTests(unittest.TestCase):
             temp = Path(temp_dir)
             project = temp / "project\nmalicious"
             install_dir = project / "install"
-            install_dir.mkdir(parents=True)
+            install_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / "install" / "linux-install.sh",
                             install_dir / "linux-install.sh")
 
             fake_bin = temp / "bin"
-            fake_bin.mkdir()
+            fake_bin.mkdir(exist_ok=True)
             python = fake_bin / "python3"
             python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             python.chmod(0o755)
 
             home = temp / "home"
-            home.mkdir()
+            home.mkdir(exist_ok=True)
             env = os.environ.copy()
             env["HOME"] = str(home)
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
@@ -107,18 +107,18 @@ class LinuxInstallTests(unittest.TestCase):
             temp = Path(temp_dir)
             project = temp / 'project "quoted" \\ $cash `ticks` %f'
             install_dir = project / "install"
-            install_dir.mkdir(parents=True)
+            install_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / "install" / "linux-install.sh",
                             install_dir / "linux-install.sh")
 
             fake_bin = temp / "bin"
-            fake_bin.mkdir()
+            fake_bin.mkdir(exist_ok=True)
             python = fake_bin / "python3"
             python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             python.chmod(0o755)
 
             home = temp / "home"
-            home.mkdir()
+            home.mkdir(exist_ok=True)
             env = os.environ.copy()
             env["HOME"] = str(home)
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
