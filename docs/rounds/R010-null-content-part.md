@@ -1,5 +1,7 @@
 # R010: build_prompt — явный `content: null` не превращается в текст «None»
 
+**Статус:** done
+
 ## Проблема
 Сообщение вида `{"role":"assistant","content":null}` (штатная форма OpenAI при
 tool_calls) проходит валидацию `messages is list of objects`, и `build_prompt`
