@@ -258,3 +258,35 @@ OK
 `python3 -m py_compile tests/test_round_queue.py` и `git diff --check` — код 0.
 Временный `.pyc` удалён. Commit и push не выполнялись; изменения оставлены для
 переноса родительским агентом.
+## R506 — проверять номера раундов длиннее трёх цифр
+
+**Итог:** тест очереди теперь проверяет `R1000` и последующие номера; раньше
+строка с четырьмя цифрами полностью выпадала из проверки статуса очереди и спеки.
+
+**Файлы:** `tests/test_round_queue.py`, `docs/rounds/R506-round-queue-four-digit-ids.md`,
+`docs/rounds/QUEUE.md`, `OUT.md`.
+
+**До исправления:**
+`PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest
+test_round_queue.RoundQueueTests.test_round_ids_above_999_are_checked` — 1 тест,
+провал; обнаружено `0` расхождений вместо ожидаемого `1` для `R1000`.
+
+**Проверки после исправления:**
+
+```text
+$ PYTHONPATH=tests PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest test_round_queue test_no_unbounded_subprocess
+Ran 6 tests in 0.297s
+OK
+
+$ PYTHONPYCACHEPREFIX="$PWD/.round486-pycache" python3 -m py_compile tests/test_round_queue.py
+exit code: 0
+
+$ git diff --check
+exit code: 0
+```
+
+Временный каталог байткода внутри репозитория удалён после компиляции. Пакеты
+не устанавливались. Осталась прежняя открытая запись R008: там не пройдены
+HTTP-проверки, требующие loopback-bind в sandbox; R506 её не затрагивает.
+Изменения оставлены локально для переноса родительским агентом; commit/push не
+выполнялись.

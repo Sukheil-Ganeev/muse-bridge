@@ -34,6 +34,31 @@ class RoundQueueTests(unittest.TestCase):
             self.assertIn("R999", result.failures[0][1])
             self.assertIn("no spec status", result.failures[0][1])
 
+    def test_round_ids_above_999_are_checked(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            round_dir = Path(temp_dir)
+            (round_dir / "QUEUE.md").write_text(
+                "| Раунд | Тема | Статус |\n"
+                "|---|---|---|\n"
+                "| R1000 | temporary open round | ✅ done |\n",
+                encoding="utf-8",
+            )
+            (round_dir / "R1000-open.md").write_text(
+                "# R1000\n\n**Статус:** в работе\n",
+                encoding="utf-8",
+            )
+
+            result = unittest.TestResult()
+            case = RoundQueueTests(
+                "test_completed_rounds_are_not_listed_as_in_progress")
+            with mock.patch(__name__ + ".ROUND_DIR", round_dir):
+                case.run(result)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(len(result.failures), 1,
+                             "the round gate must check four-digit round IDs")
+            self.assertIn("R1000", result.failures[0][1])
+
     def test_open_spec_cannot_have_completed_queue_marker(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             round_dir = Path(temp_dir)
@@ -144,7 +169,7 @@ class RoundQueueTests(unittest.TestCase):
         stale = []
         seen_round_numbers = set()
         for line in queue.splitlines():
-            row = re.match(r"^\|\s*R(\d{3})\s*\|.*\|\s*(.*?)\s*\|$",
+            row = re.match(r"^\|\s*R([0-9]+)\s*\|.*\|\s*(.*?)\s*\|$",
                            line)
             if not row:
                 continue
