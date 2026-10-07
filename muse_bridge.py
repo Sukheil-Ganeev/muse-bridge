@@ -314,8 +314,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
             except Exception:
                 try:
                     proc.kill()
-                except OSError:
-                    pass
+                except OSError as _exc:
+                    logging.getLogger(__name__).debug("suppressed %s", _exc)
                 break
 
     watch = threading.Thread(target=watchdog, daemon=True)
@@ -483,8 +483,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             try:
                 self._sse({"error": {"message": str(e)[:300]}}, lock=wlock)
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).debug("suppressed %s", _exc)
             print(f"POST {self.path} -> 502 stream-failed", flush=True)
 
     def do_GET(self):
