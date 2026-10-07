@@ -2,6 +2,8 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R446 | tests: очередь не показывает ✅ при незавершённом статусе спеки | 🟡 в работе |
+| R436 | tests: AST-гейт учитывает новые неигнорируемые Python-файлы до git add | ✅ локально, без commit/push |
 | R426 | tests: timeout на subprocess-вызовах + AST-гейт | ✅ [#54](https://github.com/Sukheil-Ganeev/muse-bridge/pull/54) |
 | R416 | install: путь с %VAR% в Windows-автозапуске отклоняется | ✅ локально, без commit/push |
 | R406 | POST: отклонять одиночные Unicode-суррогаты до запуска CLI | ✅ [#50](https://github.com/Sukheil-Ganeev/muse-bridge/pull/50) |
