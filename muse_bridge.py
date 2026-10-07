@@ -362,6 +362,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                     tail = text[len(joined):]
                     full.append(tail)
                     on_delta(tail)
+                elif text and text != joined:
+                    failure = "completed output did not match streamed deltas"
             elif pt == "run.terminal.failed":
                 payload = ev.get("payload")
                 reason = payload.get("reason") if isinstance(payload, dict) else None

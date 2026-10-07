@@ -1677,6 +1677,17 @@ class StreamAbortTests(unittest.TestCase):
         self.assertFalse(proc.killed)
         self.assertFalse(os.path.exists(recorded["path"]))
 
+    def test_conflicting_completed_text_is_not_reported_as_success(self):
+        completed = json.dumps({"payload_type": "run.terminal.completed",
+                                "payload": {"text": "complete answer"}})
+        proc = _FakeProc([_delta("partial"), completed])
+        recorded = self._patched(proc)
+
+        with self.assertRaisesRegex(RuntimeError, "completed output"):
+            self.mb.stream_muse("m", "p", "high", lambda _: None)
+
+        self.assertFalse(os.path.exists(recorded["path"]))
+
     def test_terminal_failure_reason_is_reported(self):
         event = json.dumps({"payload_type": "run.terminal.failed",
                             "payload": {"reason": "quota exceeded"}})
