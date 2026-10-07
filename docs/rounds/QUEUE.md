@@ -2,6 +2,7 @@
 
 | Раунд | Тема | Статус |
 |---|---|---|
+| R426 | tests: timeout на subprocess-вызовах + AST-гейт | ✅ локально, без commit/push |
 | R416 | install: путь с %VAR% в Windows-автозапуске отклоняется | ✅ локально, без commit/push |
 | R406 | POST: отклонять одиночные Unicode-суррогаты до запуска CLI | ✅ [#50](https://github.com/Sukheil-Ganeev/muse-bridge/pull/50) |
 | R396 | HTTP: отклонять повторные Host и Origin | ✅ локально, без commit/push |

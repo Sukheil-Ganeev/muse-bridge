@@ -35,7 +35,7 @@ class MacOSInstallTests(unittest.TestCase):
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
             result = subprocess.run(
                 ["bash", str(install_dir / "macos-install.sh")],
-                capture_output=True, text=True, env=env)
+                capture_output=True, text=True, env=env, timeout=60)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("control character", result.stderr + result.stdout)
@@ -64,7 +64,7 @@ class MacOSInstallTests(unittest.TestCase):
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
             subprocess.run(
                 ["bash", str(install_dir / "macos-install.sh")],
-                check=True, capture_output=True, text=True, env=env)
+                check=True, capture_output=True, text=True, env=env, timeout=60)
 
             plist_path = home / "Library" / "LaunchAgents" / "com.muse-bridge.plist"
             config = plistlib.loads(plist_path.read_bytes())
@@ -95,7 +95,7 @@ class LinuxInstallTests(unittest.TestCase):
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
             result = subprocess.run(
                 ["bash", str(install_dir / "linux-install.sh")],
-                capture_output=True, text=True, env=env)
+                capture_output=True, text=True, env=env, timeout=60)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("control character", result.stderr + result.stdout)
@@ -124,7 +124,7 @@ class LinuxInstallTests(unittest.TestCase):
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
             subprocess.run(
                 ["bash", str(install_dir / "linux-install.sh")],
-                check=True, capture_output=True, text=True, env=env)
+                check=True, capture_output=True, text=True, env=env, timeout=60)
 
             desktop = home / ".config" / "autostart" / "muse-bridge.desktop"
             exec_line = next(
@@ -141,7 +141,7 @@ class LinuxInstallTests(unittest.TestCase):
             validator = shutil.which("desktop-file-validate")
             if validator:
                 result = subprocess.run(
-                    [validator, str(desktop)], capture_output=True, text=True)
+                    [validator, str(desktop)], capture_output=True, text=True, timeout=60)
                 self.assertEqual(result.returncode, 0,
                                  result.stdout + result.stderr)
 
@@ -152,7 +152,7 @@ class WindowsInstallTests(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(ROOT / "install" / "windows_autostart.py"),
              bridge],
-            check=True, capture_output=True)
+            check=True, capture_output=True, timeout=60)
 
         self.assertEqual(
             result.stdout,

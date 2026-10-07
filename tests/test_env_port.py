@@ -7,7 +7,7 @@ def run(mod, env_name):
         f"m=importlib.import_module('{mod}');print(m.PORT)"
     )
     env = dict(os.environ); env["PYTHONDONTWRITEBYTECODE"]="1"
-    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=60)
     assert r.returncode == 0, r.stderr
     return int(r.stdout.strip())
 
@@ -22,6 +22,6 @@ def test_muse_bridge_blank_port_falls_back():
 
 def run_blank(mod, env_name):
     code = f"import os,importlib;os.environ['{env_name}']='  ';import {mod};print({mod}.PORT)"
-    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     return int(r.stdout.strip())
