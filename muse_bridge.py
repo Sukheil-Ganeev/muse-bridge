@@ -44,6 +44,7 @@ from request_deadline import HeaderDeadlineReader as _HeaderDeadlineReader
 from request_origin import (
     is_trusted_local_request as _is_trusted_local_request,
 )
+import logging
 
 HERE = Path(__file__).resolve().parent
 
@@ -247,7 +248,8 @@ def run_muse(model: str, prompt: str, effort: str = "high") -> str:
             continue
         try:
             ev = json.loads(line)
-        except Exception:
+        except Exception as _exc:
+            logging.getLogger(__name__).debug("suppressed %s", _exc)
             continue
         if ev.get("payload_type") == "run.terminal.completed":
             text = ((ev.get("payload") or {}).get("text") or text) or ""
@@ -327,7 +329,8 @@ def stream_muse(model: str, prompt: str, effort: str, on_delta) -> str:
                 continue
             try:
                 ev = json.loads(line)
-            except Exception:
+            except Exception as _exc:
+                logging.getLogger(__name__).debug("suppressed %s", _exc)
                 continue
             pt = ev.get("payload_type")
             if pt == "run.output.delta":
